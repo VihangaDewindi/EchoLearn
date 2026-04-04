@@ -17,7 +17,7 @@ export default function TeacherDashboard() {
       {/* Navbar */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-8">
-          <Image src="/logo2.png" alt="EchoLearn" width={140} height={36} className="object-contain" />
+          <Image src="/logo.png" alt="EchoLearn" width={140} height={36} className="object-contain" />
           <div className="flex items-center gap-6">
             <a href="#" className="text-sm font-medium text-[#2D3E75] border-b-2 border-[#2D3E75] pb-1">Dashboard</a>
             <a href="#" className="text-sm font-medium text-gray-900 hover:text-[#2D3E75]">Classes</a>
@@ -43,7 +43,7 @@ export default function TeacherDashboard() {
       </nav>
 
       {/* Header stats */}
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="p-6 max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-2">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Welcome back, Sarah!</h1>
@@ -109,7 +109,7 @@ export default function TeacherDashboard() {
                 <tr key={idx}>
                   <td className="flex items-center gap-3 p-4">
                     <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-700">
-                      {s.name.split(' ').map(n=>n[0]).join('')}
+                      {s.name.split(' ').map(n => n[0]).join('')}
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900">{s.name}</p>
@@ -140,13 +140,13 @@ export default function TeacherDashboard() {
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Class Engagement Trend</h3>
             <div className="flex items-end gap-1 h-24">
               {/* fixed heights for each day, dark bar for Sunday */}
-              <div className="flex-1 bg-[#cfdfff] rounded-t-md" style={{height: '40%'}}></div>
-              <div className="flex-1 bg-[#bedfff] rounded-t-md" style={{height: '50%'}}></div>
-              <div className="flex-1 bg-[#aedfff] rounded-t-md" style={{height: '60%'}}></div>
-              <div className="flex-1 bg-[#9edfff] rounded-t-md" style={{height: '55%'}}></div>
-              <div className="flex-1 bg-[#8edfff] rounded-t-md" style={{height: '65%'}}></div>
-              <div className="flex-1 bg-[#7edfff] rounded-t-md" style={{height: '70%'}}></div>
-              <div className="flex-1 bg-[#2D3E75] rounded-t-md" style={{height: '80%'}}></div>
+              <div className="flex-1 bg-[#cfdfff] rounded-t-md" style={{ height: '40%' }}></div>
+              <div className="flex-1 bg-[#bedfff] rounded-t-md" style={{ height: '50%' }}></div>
+              <div className="flex-1 bg-[#aedfff] rounded-t-md" style={{ height: '60%' }}></div>
+              <div className="flex-1 bg-[#9edfff] rounded-t-md" style={{ height: '55%' }}></div>
+              <div className="flex-1 bg-[#8edfff] rounded-t-md" style={{ height: '65%' }}></div>
+              <div className="flex-1 bg-[#7edfff] rounded-t-md" style={{ height: '70%' }}></div>
+              <div className="flex-1 bg-[#2D3E75] rounded-t-md" style={{ height: '80%' }}></div>
             </div>
           </div>
           <div className="bg-[#2D3E75] text-white rounded-xl p-6 shadow-sm relative">
