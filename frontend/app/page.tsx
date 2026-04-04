@@ -11,45 +11,48 @@ export default function EchoLearnLanding() {
 
 
       {/* --- Hero Section --- */}
-      <header className="bg-[#F3F4F6] py-16">
-        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6">
+      <header className="bg-[#F3F4F6] pt-32 pb-16">
+        <div className="max-w-6xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+
+          {/* Left */}
+          <div className="space-y-6 pr-8">
             <h1 className="text-6xl font-black text-[#1E1E1E] leading-[1.1]">
               Accessible <br /> Learning for <br />
               <span className="text-[#1F3F7F]">Every Student</span>
             </h1>
+
             <p className="text-gray-900 text-lg max-w-md leading-relaxed">
               Empowering Sri Lankan students with specialized tools for visual impairment and dyslexia.
-              Learn without limits, break every barrier.
             </p>
+
             <div className="flex gap-4 pt-4">
-              <button className="bg-[#1F3F7F] text-white px-8 py-4 rounded-lg font-bold shadow-lg shadow-blue-900/20 hover:scale-105 transition-transform">
+              <button className="bg-[#1F3F7F] text-white px-8 py-4 rounded-lg font-bold hover:scale-105 transition">
                 Get Started
               </button>
-              <button className="bg-white border-2 border-gray-200 text-gray-700 px-8 py-4 rounded-lg font-bold hover:bg-gray-50 transition-colors">
+              <button className="bg-white border px-8 py-4 rounded-lg font-bold">
                 Watch Demo
               </button>
             </div>
           </div>
 
-          <div className="relative">
-
-            {/* Replace /student.png with your uploaded illustration */}
+          {/* Right */}
+          <div className="relative max-w-lg ml-auto">
             <img
               src="/person.png"
-              alt="Student with tablet"
-              className="rounded-[1rem] w-full object-cover"
+              alt="Student"
+              className="rounded-2xl w-full object-cover"
             />
 
-            {/* Decorative background shape */}
-            <div className="absolute -top-10 -right-10 w-64 h-64 bg-[#FDEBD0] rounded-full blur-3xl opacity-50 -z-0" />
+            <div className="absolute -top-10 -right-10 w-64 h-64 bg-[#FDEBD0] rounded-full blur-3xl opacity-50" />
           </div>
+
         </div>
       </header>
 
+
       {/* --- Features Section --- */}
       <section className="bg-white py-24 px-6">
-        <div className="max-w-7xl mx-auto text-center space-y-4">
+        <div className="max-w-6xl mx-auto text-center space-y-4">
           <p className="text-[#2D4496] text-m font-extrabold tracking-[0.2em] uppercase">Our Toolbox</p>
           <h2 className="text-4xl font-extrabold text-[#1E1E1E]">Designed for Real Needs</h2>
           <p className="text-gray-700 max-w-2xl mx-auto">
@@ -84,7 +87,7 @@ export default function EchoLearnLanding() {
 
       {/* --- Mission/Empowering Section --- */}
       <section className="bg-white py-6 px-6">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-8 items-center">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-center">
           <div className="rounded-7xl overflow-hidden relative p-4">
             <img
               src="/book.jpg"
@@ -112,7 +115,7 @@ export default function EchoLearnLanding() {
 
       {/* --- Impact Statistics Section --- */}
       <section className="bg-[#F3F4F6] py-15 px-6">
-        <div className="max-w-7xl mx-auto text-center space-y-4">
+        <div className="max-w-6xl mx-auto text-center space-y-4">
           <h2 className="text-4xl font-black text-[#1E1E1E]">Our Impact</h2>
           <p className="text-gray-600 text-lg max-w-2xl mx-auto">
             Measuring our progress in building a more inclusive Sri Lanka
@@ -157,7 +160,15 @@ export default function EchoLearnLanding() {
   );
 }
 
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
+function FeatureCard({
+  icon,
+  title,
+  desc,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+}) {
   return (
     <div className="bg-[#F3F4F6] p-8 rounded-2xl text-left hover:bg-[#E5E7EB] transition-colors group">
       <div className="bg-[#1F3F7F] text-white w-12 h-12 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -168,7 +179,6 @@ function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: stri
     </div>
   );
 }
-
 function CheckItem({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-3">
@@ -180,7 +190,13 @@ function CheckItem({ text }: { text: string }) {
   );
 }
 
-function StatCard({ number, label }: { number: string, label: string }) {
+function StatCard({
+  number,
+  label,
+}: {
+  number: string;
+  label: string;
+}) {
   return (
     <div className="space-y-3">
       <p className="text-5xl font-black text-[#2D4496]">{number}</p>
