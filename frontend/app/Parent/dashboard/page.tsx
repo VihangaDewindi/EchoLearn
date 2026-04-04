@@ -36,7 +36,7 @@ export default function ParentDashboard() {
       </nav>
 
       {/* Main content */}
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
         {/* Profile header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center gap-4">
