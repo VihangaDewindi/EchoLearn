@@ -13,7 +13,7 @@ export default function DashboardNavbar() {
         {/* Logo */}
         <div className="flex items-center gap-2">
           <Image
-            src="/logo2.png"
+            src="/logo.png"
             alt="EchoLearn"
             width={140}
             height={36}
