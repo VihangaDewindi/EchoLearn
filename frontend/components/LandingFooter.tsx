@@ -5,11 +5,11 @@ import { Globe, MessageSquare } from 'lucide-react';
 export default function LandingFooter() {
   return (
     <footer className="bg-gray-50 border-t border-gray-200 text-[#0f1720] py-16 px-6">
-      <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-16 mb-12 items-start">
-        
+      <div className="max-w-6xl mx-auto grid md:grid-cols-4 gap-16 mb-12 items-start">
+
         <div className="col-span-1">
           <div className="flex items-center gap-3 mb-3">
-            <img src="/logo2.png" alt="EchoLearn" className="h-10 w-auto" />
+            <img src="/logo.png" alt="EchoLearn" className="h-10 w-auto" />
           </div>
           <p className="text-gray-700 text-sm leading-relaxed max-w-xs">
             Sri Lanka's premier inclusive education platform for students with visual and cognitive learning differences.
@@ -64,7 +64,7 @@ export default function LandingFooter() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto mt-16 border-t border-gray-100 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="max-w-6xl mx-auto mt-16 border-t border-gray-100 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
         <p className="text-gray-800 text-xs text-center">
           © 2024 EchoLearn Sri Lanka. All rights reserved.
         </p>
