@@ -9,10 +9,10 @@ import VoiceAssistantButton from '../../../components/Dashboard/VoiceAssisstantB
 export default function StudentDashboard() {
   return (
     <div className="min-h-screen bg-[#F5F6F8] font-sans">
-     <DashboardNavbar />
+      <DashboardNavbar />
 
       {/* Main Content */}
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="p-6 max-w-6xl mx-auto">
         {/* Welcome Banner */}
         <div className="bg-white rounded-xl p-8 mb-6 flex flex-col md:flex-row justify-between items-start border border-gray-100 shadow-sm">
           <div className="mb-6 md:mb-0">
@@ -48,7 +48,7 @@ export default function StudentDashboard() {
                 <h2 className="text-xl font-bold text-gray-900">Continue Learning</h2>
                 <a href="#" className="text-sm font-semibold text-[#2D3E75] hover:underline">View Library</a>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-[#8B977F] rounded-2xl p-8 text-white flex flex-col items-center justify-center aspect-[3/2]">
                   <p className="text-2xl font-black text-center">LESSON</p>
@@ -59,7 +59,7 @@ export default function StudentDashboard() {
                   <p className="text-xs font-bold text-gray-600 tracking-widest uppercase mb-2">MATHEMATICS Unit 3: Fractions</p>
                   <h3 className="text-xl font-bold text-gray-900 mb-3">Introduction to Fractions</h3>
                   <p className="text-sm text-gray-600 mb-4">Master the basics of numerators, denominators, and equivalent fractions through visual puzzles.</p>
-                  
+
                   <div className="mb-4">
                     <p className="text-xs font-semibold text-gray-700 mb-2">Progress</p>
                     <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -78,7 +78,7 @@ export default function StudentDashboard() {
             {/* Progress Overview */}
             <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-6">My Progress Overview</h2>
-              
+
               <div className="grid grid-cols-3 gap-6">
                 <div className="text-center bg-white rounded-lg p-4 shadow-sm">
                   <p className="text-4xl font-black text-gray-900 mb-1">80%</p>
@@ -107,7 +107,7 @@ export default function StudentDashboard() {
             {/* Weekly Study Plan */}
             <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Weekly Study Plan</h2>
-              
+
               <div className="space-y-4">
                 {[
                   { day: 'Mon', subject: 'Algebra', progress: 90 },
@@ -119,7 +119,7 @@ export default function StudentDashboard() {
                     <span className="font-semibold text-gray-700 w-20">{item.day}</span>
                     <span className="text-sm text-gray-600 w-24">{item.subject}</span>
                     <div className="flex-1 mx-4 h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className={`h-full ${item.progress === 90 ? 'bg-orange-400' : item.progress === 40 ? 'bg-green-500' : item.progress === 20 ? 'bg-purple-500' : 'bg-gray-300'}`}
                         style={{ width: `${item.progress || 5}%` }}
                       ></div>
@@ -133,7 +133,7 @@ export default function StudentDashboard() {
             {/* Recent Activity */}
             <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Recent Activity</h2>
-              
+
               <div className="space-y-4">
                 <div className="flex items-start gap-4 pb-4 border-b border-gray-100">
                   <div className="w-2 h-2 bg-orange-400 rounded-full mt-2"></div>
@@ -168,7 +168,7 @@ export default function StudentDashboard() {
                 <h2 className="text-lg font-bold text-gray-900">Recent Achievements</h2>
                 <a href="#" className="text-xs font-semibold text-[#2D3E75] hover:underline">View All</a>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="flex items-start gap-3 bg-yellow-50 p-3 rounded-lg">
                   <div className="bg-yellow-300 rounded-lg p-2 flex-shrink-0">
@@ -205,7 +205,7 @@ export default function StudentDashboard() {
             {/* Recommended */}
             <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Recommended for You</h2>
-              
+
               <div className="space-y-3">
                 <div className="bg-orange-50 rounded-lg p-4 border-l-4 border-orange-400">
                   <p className="text-xs font-bold text-orange-600 mb-1">ADVANCED</p>
@@ -233,7 +233,7 @@ export default function StudentDashboard() {
             {/* Learning Community */}
             <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Learning Community</h2>
-              
+
               <div className="grid grid-cols-2 gap-3">
                 <button className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg p-4 text-center transition">
                   <Mic size={24} className="mx-auto mb-2 text-gray-600" />
