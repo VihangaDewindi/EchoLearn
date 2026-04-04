@@ -22,7 +22,7 @@ const LoginPage = () => {
       <nav className="w-full h-12 px-6 md:px-12 flex justify-between items-center bg-white/50 border-b border-gray-200 backdrop-blur-sm shrink-0">
         <div className="flex items-center">
           <Image 
-            src="/logo2.png" 
+            src="/logo.png" 
             alt="EchoLearn Logo" 
             width={120} 
             height={50} 
