@@ -6,8 +6,9 @@ const userSchema = new mongoose.Schema({
     enum: ["student", "teacher", "parent"],
     required: true,
   },
-  username: {
+  fullName: {
     type: String,
+    required: true,
   },
   email: {
     type: String,
