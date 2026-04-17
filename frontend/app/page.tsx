@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
 import { Volume2, Command, Keyboard, Type, CheckCircle2, Globe, MessageSquare } from 'lucide-react';
 import LandingNavbar from '@/components/LandingNavbar';
@@ -8,7 +9,6 @@ export default function EchoLearnLanding() {
   return (
     <div className="min-h-screen bg-white text-[#111827] font-sans">
       <LandingNavbar />
-
 
       {/* --- Hero Section --- */}
       <header className="bg-[#F3F4F6] pt-32 pb-16">
@@ -26,9 +26,12 @@ export default function EchoLearnLanding() {
             </p>
 
             <div className="flex gap-4 pt-4">
-              <button className="bg-[#1F3F7F] text-white px-8 py-4 rounded-lg font-bold hover:scale-105 transition">
+              <Link
+                href="/signup"
+                className="bg-[#1F3F7F] text-white px-8 py-4 rounded-lg font-bold hover:scale-105 transition"
+              >
                 Get Started
-              </button>
+              </Link>
               <button className="bg-white border px-8 py-4 rounded-lg font-bold">
                 Watch Demo
               </button>
@@ -37,9 +40,11 @@ export default function EchoLearnLanding() {
 
           {/* Right */}
           <div className="relative max-w-lg ml-auto">
-            <img
+            <Image
               src="/person.png"
               alt="Student"
+              width={500}
+              height={500}
               className="rounded-2xl w-full object-cover"
             />
 
@@ -89,9 +94,11 @@ export default function EchoLearnLanding() {
       <section className="bg-white py-6 px-6">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-center">
           <div className="rounded-7xl overflow-hidden relative p-4">
-            <img
+            <Image
               src="/book.jpg"
               alt="Hand writing in notebook"
+              width={600}
+              height={400}
               className="rounded-[1rem] w-full object-cover"
             />
           </div>
@@ -106,8 +113,8 @@ export default function EchoLearnLanding() {
             </p>
             <div className="space-y-4">
               <CheckItem text="Aligned with National Curriculum" />
-              <CheckItem text="Bilingual Support (Sinhala & Tamil)" />
-              <CheckItem text="Offline-first accessibility features" />
+              <CheckItem text="Assistive Learning Tools (TTS & Voice Navigation)" />
+              <CheckItem text="Dyslexia-Friendly Reading Experience" />
             </div>
           </div>
         </div>
@@ -149,11 +156,15 @@ export default function EchoLearnLanding() {
           <p className="text-lg leading-relaxed">
             Join thousands of Sri Lankan students who are already <br></br> learning without boundaries. Sign up for free today.
           </p>
-          <button className="bg-white text-[#1F3F7F] px-10 py-4 rounded-lg font-bold hover:bg-gray-200 transition-colors text-lg shadow-xl">
+          <Link
+            href="/signup"
+            className="bg-white text-[#1F3F7F] px-10 py-4 rounded-lg font-bold hover:bg-gray-200 transition-colors text-lg shadow-xl inline-block"
+          >
             Get Started for Free
-          </button>
+          </Link>
         </div>
       </section>
+      <div className="h-16 bg-[#F3F4F6]"></div>
 
       <LandingFooter />
     </div>
