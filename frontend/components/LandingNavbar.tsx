@@ -3,12 +3,15 @@
 import Link from "next/link";
 import Image from "next/image";
 
+
 export default function LandingNavbar() {
+
+
   return (
     <div className="w-full bg-white flex justify-center sticky top-0 z-50">
-      <nav className="w-full max-w-6xl px-6 h-[72px] flex items-center justify-between">
+      <nav className="relative w-full max-w-6xl px-6 h-[72px] flex items-center justify-between">
 
-        {/* Logo */}
+        {/* Logo (Left) */}
         <Link href="/" className="flex items-center">
           <Image
             src="/logo.png"
@@ -19,26 +22,26 @@ export default function LandingNavbar() {
           />
         </Link>
 
-        {/* Links & CTA */}
-        <div className="flex items-center gap-8">
-          <div className="hidden md:flex items-center gap-8">
-            <NavLink label="Features" href="/features" />
-            <NavLink label="Accessibility" href="/accessibility" />
-            <NavLink label="Courses" href="/courses" />
-            <NavLink label="About Us" href="/about" />
-          </div>
+        {/* Center Links */}
+        <div className="hidden md:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
+          <NavLink label="Home" href="/" />
+          <NavLink label="Features" href="/features" />
+          <NavLink label="Courses" href="/courses" />
+          <NavLink label="About Us" href="/about" />
+        </div>
 
-          <div className="flex items-center gap-5">
-            <Link href="/login" className="text-sm font-semibold text-gray-600 hover:text-[#1E2B5A] transition-colors">
-              Login
-            </Link>
-            <Link href="/signup" className="bg-[#3A4A8A] text-white px-6 py-2.5 rounded-md text-sm font-semibold hover:bg-[#1E2B5A] transition-colors shadow-sm">
-              Get Started
-            </Link>
-          </div>
+        {/* Right Side */}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className="bg-[#2D4496] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#1E2B5A] transition"
+          >
+            Login
+          </Link>
         </div>
 
       </nav>
+
     </div>
   );
 }
