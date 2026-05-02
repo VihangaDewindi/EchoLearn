@@ -32,7 +32,9 @@ const userSchema = new mongoose.Schema({
     math: { type: Number, default: 0 },
     science: { type: Number, default: 0 },
     english: { type: Number, default: 0 }
-  }
+  },
+  resetToken: { type: String },
+  resetTokenExpiry: { type: Date },
 }, { timestamps: true });
 
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);
