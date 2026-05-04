@@ -189,9 +189,9 @@ export default function AboutPage() {
       {/* ================= CTA ================= */}
       <section className="bg-[#1F3F7F] text-white py-24 px-6">
               <div className="max-w-4xl mx-auto text-center space-y-6">
-                <h2 className="text-4xl font-black">Ready to make a difference?
+                <h2 className="text-4xl font-black">Ready to make a difference?</h2>
                 <p className="text-lg leading-relaxed">Join us in our mission to reshape the educational landscape of Sri Lanka.</p>
-        </h2>
+        
 
         <Link href="/signup"
           className="bg-white text-[#1F3F7F] px-10 py-4 rounded-lg font-bold hover:bg-gray-200 transition-colors text-lg shadow-xl inline-block">Get Started for Free
