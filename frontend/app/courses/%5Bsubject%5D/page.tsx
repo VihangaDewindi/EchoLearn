@@ -26,13 +26,13 @@ export default function SubjectDiscoveryPage() {
   const [loading, setLoading] = useState(true);
 
   const subjectData = subjects.find(
-    (s) => s.tag.toLowerCase() === (subject as string).toLowerCase()
+    (s) => s.tag.toLowerCase() === (subject as string || "").toLowerCase()
   );
 
   useEffect(() => {
     if (subject) {
       setLoading(true);
-      fetch(`http://localhost:5000/api/courses?tag=${subject}`)
+      fetch(`http://localhost:5001/api/courses?tag=${subject}`)
         .then((res) => res.json())
         .then((data) => {
           setCourses(data);
