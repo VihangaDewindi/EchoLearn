@@ -53,46 +53,111 @@ router.post("/register", async (req, res) => {
 // LOGIN
 router.post("/login", async (req, res) => {
   try {
-    const { role, email, password } = req.body;
+    const { email, password, role } = req.body;
 
-    // 1. Basic Validation
-    if (!role || !email || !password) {
-      return res.status(400).json({ error: "All fields are required" });
+    console.log("Incoming body:", req.body);
+    console.log("Email:", email);
+    console.log("Role:", role);
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
     }
 
-    // 2. Find user & Verify Role (Search by either email or username/fullName)
     const user = await User.findOne({
-      $or: [
-        { email: email },
-        { fullName: email }
+      $and: [
+        { role: role.trim().toLowerCase() },
+        {
+          $or: [
+            { email: email.trim() },
+            { fullName: email.trim() }
+          ]
+        }
       ]
     });
 
+    console.log("User found:", user);
+
     if (!user) {
-        return res.status(400).json({ error: "Invalid email or username" });
+      return res.status(400).json({ error: "Invalid email or username" });
     }
 
-    if (user.role !== role) {
-        return res.status(400).json({ error: `Account registered as a ${user.role}, please select the correct role.` });
-    }
-
-    // 3. Verify Password
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log("Password match:", isMatch);
+
     if (!isMatch) {
-        return res.status(400).json({ error: "Invalid password" });
+      return res.status(400).json({ error: "Invalid password" });
     }
 
-    // 4. Generate Token
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET || "fallback_secret_key",
       { expiresIn: "1d" }
     );
 
-    res.json({ token, user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role } });
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role
+      }
+    });
   } catch (err) {
     console.error("Login Error:", err);
     res.status(500).json({ error: "Server error during login" });
+  }
+});
+
+
+// FORGOT PASSWORD — generate a reset token and return it (demo: no email, token shown in UI)
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    const user = await User.findOne({ email: email.trim() });
+    if (!user) return res.status(404).json({ error: "No account found with that email address" });
+
+    // Generate a simple token: base64(userId + timestamp)
+    const raw = `${user._id}:${Date.now()}`;
+    const token = Buffer.from(raw).toString("base64url");
+
+    // Store token + expiry on the user (1 hour)
+    user.resetToken = token;
+    user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
+    await user.save();
+
+    // In production you'd email the token. For this demo we return it directly.
+    res.json({ message: "Reset token generated", token });
+  } catch (err) {
+    console.error("Forgot-password error:", err);
+    res.status(500).json({ error: "Server error. Please try again." });
+  }
+});
+
+// RESET PASSWORD — validate token, hash new password
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ error: "Token and new password are required" });
+    if (newPassword.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+
+    const user = await User.findOne({
+      resetToken: token,
+      resetTokenExpiry: { $gt: new Date() },
+    });
+    if (!user) return res.status(400).json({ error: "Invalid or expired reset token" });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+    await user.save();
+
+    res.json({ message: "Password reset successfully" });
+  } catch (err) {
+    console.error("Reset-password error:", err);
+    res.status(500).json({ error: "Server error. Please try again." });
   }
 });
 
