@@ -1,165 +1,178 @@
 "use client";
 
 import React from 'react';
-import Image from 'next/image';
-import { ChartBar, BookOpen, UserCheck, Search, Settings } from 'lucide-react';
+import TeacherNavbar from '@/components/Teacher/TeacherNavbar';
+import TeacherFooter from '@/components/Teacher/TeacherFooter';
+import { ChartBar, BookOpen, UserCheck, BarChart3 } from 'lucide-react';
+
+const API = "http://localhost:5001";
+
+function timeAgo(date: string) {
+  const diff = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
 
 export default function TeacherDashboard() {
-  const students = [
-    { name: 'Alex Johnson', grade: '10th', lastActive: '2h ago', progress: 78, quiz: 92 },
-    { name: 'Marcus Miller', grade: '10th', lastActive: '2d ago', progress: 32, quiz: 58, support: true },
-    { name: 'Chloe Chen', grade: '10th', lastActive: '10m ago', progress: 95, quiz: 98 },
-    { name: 'Sasha Brown', grade: '10th', lastActive: '1h ago', progress: 65, quiz: 81 },
-  ];
+  const [user, setUser] = React.useState<any>(null);
+  const [data, setData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) setUser(JSON.parse(savedUser));
+  }, []);
+
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    fetch(`${API}/api/teacher/dashboard`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((d) => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const firstName = user?.fullName?.split(" ")[0] || "Teacher";
+  const students = data?.students || [];
 
   return (
-    <div className="min-h-screen bg-[#F5F6F8] font-sans">
-      {/* Navbar */}
-      <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-8">
-          <Image src="/logo.png" alt="EchoLearn" width={140} height={36} className="object-contain" />
-          <div className="flex items-center gap-6">
-            <a href="#" className="text-sm font-medium text-[#2D3E75] border-b-2 border-[#2D3E75] pb-1">Dashboard</a>
-            <a href="#" className="text-sm font-medium text-gray-900 hover:text-[#2D3E75]">Classes</a>
-            <a href="#" className="text-sm font-medium text-gray-900 hover:text-[#2D3E75]">Students (Active)</a>
-            <a href="#" className="text-sm font-medium text-gray-900 hover:text-[#2D3E75]">Curriculum</a>
-            <a href="#" className="text-sm font-medium text-gray-900 hover:text-[#2D3E75]">Reports</a>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 flex-1 justify-center px-6 max-w-2xl mx-auto">
-          <div className="flex items-center gap-3 bg-white px-3 py-2 rounded-full shadow-sm w-full">
-            <Search size={18} className="text-gray-400" />
-            <input type="text" placeholder="Quick search..." className="bg-transparent rounded-full px-2 py-1 text-sm w-full focus:outline-none placeholder-gray-400" />
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <button className="p-2 hover:bg-gray-100 rounded-lg transition">
-            <Settings size={20} className="text-gray-600" />
-          </button>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-bold">
-            S
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-[#F8FAFD] flex flex-col font-sans">
+      <TeacherNavbar />
 
-      {/* Header stats */}
-      <div className="p-6 max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-2">
+      <main className="flex-1 p-6 max-w-6xl mx-auto w-full text-left">
+        <div className="flex items-center justify-between mb-8 mt-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Welcome back, Sarah!</h1>
-            <p className="text-gray-600">Here's a snapshot of your 10th Grade Biology class today.</p>
+            <h1 className="text-[32px] font-black text-[#1E273F] tracking-tight">Welcome back, {firstName}!</h1>
+            <p className="text-[#8793AC] font-semibold mt-1">Here's a snapshot of your classes today.</p>
           </div>
           <div className="flex items-center gap-3">
-            <p className="text-sm text-gray-500">October 24, 2023</p>
-            <button className="bg-[#2D3E75] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#24335b]">New Lesson</button>
+            <p className="text-sm font-bold text-[#8793AC]">{new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+            <button className="bg-[#33478D] text-white text-[14px] px-6 py-2.5 rounded-xl font-black shadow-lg shadow-blue-900/10 hover:bg-[#2A3B7A] transition-all">New Lesson</button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-6 flex items-center gap-4 shadow-sm">
-            <div className="w-10 h-10 bg-[#E3E8FF] rounded-full flex items-center justify-center">
-              <ChartBar className="text-[#2D3E75]" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          <div className="bg-white rounded-[24px] p-8 flex items-center gap-6 shadow-sm border border-[#E5E9F0]">
+            <div className="w-14 h-14 bg-[#F0F2FA] rounded-2xl flex items-center justify-center">
+              <ChartBar className="text-[#33478D]" size={28} />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase">Class average score</p>
+              <p className="text-[11px] font-black text-[#8793AC] uppercase tracking-wider mb-1">Class average score</p>
               <div className="flex items-center gap-2">
-                <p className="text-2xl font-black text-gray-900">84%</p>
-                <p className="text-sm text-green-500">+2.5%</p>
+                <p className="text-[28px] font-black text-[#1E273F]">{loading ? "—" : `${data?.avgQuizScore ?? 84}%`}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-6 flex items-center gap-4 shadow-sm">
-            <div className="w-10 h-10 bg-[#F3E8FF] rounded-full flex items-center justify-center">
-              <BookOpen className="text-[#8B5CF6]" />
+          <div className="bg-white rounded-[24px] p-8 flex items-center gap-6 shadow-sm border border-[#E5E9F0]">
+            <div className="w-14 h-14 bg-[#F5F3FF] rounded-2xl flex items-center justify-center">
+              <BookOpen className="text-[#8B5CF6]" size={28} />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase">Total lessons completed</p>
-              <p className="text-2xl font-black text-gray-900">1,240 –</p>
+              <p className="text-[11px] font-black text-[#8793AC] uppercase tracking-wider mb-1">Total Students</p>
+              <p className="text-[28px] font-black text-[#1E273F]">{loading ? "—" : data?.totalStudents ?? 0}</p>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-6 flex items-center gap-4 shadow-sm">
-            <div className="w-10 h-10 bg-[#FEF3C7] rounded-full flex items-center justify-center">
-              <UserCheck className="text-[#D97706]" />
+          <div className="bg-white rounded-[24px] p-8 flex items-center gap-6 shadow-sm border border-[#E5E9F0]">
+            <div className="w-14 h-14 bg-[#FFFBEB] rounded-2xl flex items-center justify-center">
+              <UserCheck className="text-[#D97706]" size={28} />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase">Students needing support</p>
-              <div className="flex items-center gap-2">
-                <p className="text-2xl font-black text-gray-900">4</p>
-                <p className="text-sm text-orange-500">Δ+1</p>
-              </div>
+              <p className="text-[11px] font-black text-[#8793AC] uppercase tracking-wider mb-1">Students needing support</p>
+              <p className="text-[28px] font-black text-[#1E273F]">{loading ? "—" : data?.studentsNeedingSupport ?? 0}</p>
             </div>
           </div>
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-white rounded-[24px] overflow-hidden shadow-sm border border-[#E5E9F0] mb-10">
           <table className="w-full text-left">
-            <thead className="bg-white sticky top-0 z-30">
-              <tr>
-                <th className="p-4 text-gray-700">Student Name</th>
-                <th className="p-4 text-gray-700">Grade</th>
-                <th className="p-4 text-gray-700">Last Active</th>
-                <th className="p-4 text-gray-700">Progress %</th>
-                <th className="p-4 text-gray-700">Avg. Quiz Score</th>
-                <th className="p-4 text-gray-700">Actions</th>
+            <thead>
+              <tr className="border-b border-[#E5E9F0]">
+                <th className="p-6 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Student Name</th>
+                <th className="p-6 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Level</th>
+                <th className="p-6 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Last Active</th>
+                <th className="p-6 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Progress %</th>
+                <th className="p-6 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Avg. Quiz Score</th>
+                <th className="p-6 text-[12px] font-black text-[#8793AC] uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {students.map((s, idx) => (
-                <tr key={idx}>
-                  <td className="flex items-center gap-3 p-4">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-700">
-                      {s.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">{s.name}</p>
-                      {s.support && <p className="text-xs text-orange-500">! Needs Support</p>}
+            <tbody className="divide-y divide-[#F5F7FB]">
+              {loading ? (
+                <tr><td colSpan={6} className="p-8 text-center text-[#8793AC] font-bold">Loading students...</td></tr>
+              ) : students.length === 0 ? (
+                <tr><td colSpan={6} className="p-8 text-center text-[#8793AC] font-bold">No students enrolled yet. Add students to your classes.</td></tr>
+              ) : students.map((s: any, idx: number) => (
+                <tr key={idx} className="hover:bg-[#F8FAFD] transition-colors">
+                  <td className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-[#33478D] flex items-center justify-center text-white text-[14px] font-black">
+                        {s.fullName.split(' ').map((n: string) => n[0]).join('')}
+                      </div>
+                      <div>
+                        <p className="text-[15px] font-black text-[#1E273F]">{s.fullName}</p>
+                        {s.status === 'struggling' && <p className="text-[11px] font-bold text-orange-500 mt-1 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></span>
+                          Needs Support
+                        </p>}
+                      </div>
                     </div>
                   </td>
-                  <td className="p-4 text-gray-700">{s.grade}</td>
-                  <td className="p-4 text-gray-700">{s.lastActive}</td>
-                  <td className="p-4">
-                    <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-[#2D3E75]" style={{ width: `${s.progress}%` }}></div>
+                  <td className="p-6 text-[14px] font-bold text-[#5E6D8F]">LVL {s.level}</td>
+                  <td className="p-6 text-[14px] font-bold text-[#5E6D8F]">{timeAgo(s.lastActive)}</td>
+                  <td className="p-6 text-[14px]">
+                    <div className="w-32 h-2 bg-[#F0F2F5] rounded-full overflow-hidden">
+                      <div className="h-full bg-[#33478D] transition-all duration-700 shadow-sm" style={{ width: `${s.progress}%` }}></div>
                     </div>
+                    <span className="text-[11px] font-black text-[#8793AC] mt-1 block">{s.progress}%</span>
                   </td>
-                  <td className="p-4 text-gray-700 font-semibold">{s.quiz}%</td>
-                  <td className="p-4 text-right">
-                    <button className="text-sm text-[#2D3E75] hover:underline">View</button>
+                  <td className="p-6 text-[15px] font-black text-[#1E273F]">{s.quizAvg}%</td>
+                  <td className="p-6 text-right">
+                    <button className="text-[13px] font-black text-[#33478D] hover:underline uppercase tracking-wider">View Full Profile</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="p-4 text-xs text-gray-500">Showing 4 of 28 students</div>
+          <div className="p-6 bg-[#F5F7FB] border-t border-[#D5DCEB] text-[12px] font-black text-[#8793AC] uppercase tracking-wider">
+            Showing {students.length} of {data?.totalStudents ?? students.length} students
+          </div>
         </div>
 
         {/* Bottom cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Class Engagement Trend</h3>
-            <div className="flex items-end gap-1 h-24">
-              {/* fixed heights for each day, dark bar for Sunday */}
-              <div className="flex-1 bg-[#cfdfff] rounded-t-md" style={{ height: '40%' }}></div>
-              <div className="flex-1 bg-[#bedfff] rounded-t-md" style={{ height: '50%' }}></div>
-              <div className="flex-1 bg-[#aedfff] rounded-t-md" style={{ height: '60%' }}></div>
-              <div className="flex-1 bg-[#9edfff] rounded-t-md" style={{ height: '55%' }}></div>
-              <div className="flex-1 bg-[#8edfff] rounded-t-md" style={{ height: '65%' }}></div>
-              <div className="flex-1 bg-[#7edfff] rounded-t-md" style={{ height: '70%' }}></div>
-              <div className="flex-1 bg-[#2D3E75] rounded-t-md" style={{ height: '80%' }}></div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+          <div className="bg-white rounded-[24px] p-8 shadow-sm border border-[#E5E9F0]">
+            <h3 className="text-[16px] font-black text-[#1E273F] mb-6">Class Engagement Trend</h3>
+            <div className="flex items-end gap-2 h-32 px-2">
+              {[40, 50, 60, 55, 65, 70, 80].map((h, i) => (
+                <div key={i} className={`flex-1 rounded-t-xl transition-all ${i === 6 ? 'bg-[#33478D]' : 'bg-[#F0F2F5] hover:bg-[#33478D]'}`} style={{ height: `${h}%` }}></div>
+              ))}
+            </div>
+            <div className="flex justify-between mt-4 text-[11px] font-black text-[#8793AC] uppercase tracking-[0.2em] px-2">
+              {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => <span key={d}>{d}</span>)}
             </div>
           </div>
-          <div className="bg-[#2D3E75] text-white rounded-xl p-6 shadow-sm relative">
-            <span className="uppercase text-xs bg-white/10 px-2 py-1 rounded-full">Proactive Insight</span>
-            <h3 className="text-xl font-bold mt-4">Identify struggling students early with EchoLearn AI.</h3>
-            <p className="mt-2 text-sm">Our algorithms noticed 3 students are spending 4x more time on 'Cell Mitosis' than the class average. Would you like to schedule a review session?</p>
-            <div className="mt-4 flex gap-3">
-              <button className="bg-white text-[#2D3E75] px-4 py-2 rounded-lg font-semibold">Schedule Review</button>
-              <button className="bg-white/20 text-white px-4 py-2 rounded-lg font-semibold">Dismiss</button>
+          <div className="bg-[#1E2B5A] text-white rounded-[24px] p-8 shadow-xl relative overflow-hidden flex flex-col justify-center">
+            <div className="absolute top-0 right-0 p-8 opacity-10"><BarChart3 size={120} /></div>
+            <span className="w-fit uppercase text-[10px] font-black bg-white/10 px-3 py-1 rounded-md tracking-widest border border-white/20">Proactive Insight</span>
+            <h3 className="text-[24px] font-black mt-4 leading-tight">Identify struggling students early with EchoLearn AI.</h3>
+            <p className="mt-3 text-[14px] text-white/70 font-medium leading-relaxed">
+              {data?.studentsNeedingSupport > 0
+                ? `${data.studentsNeedingSupport} student${data.studentsNeedingSupport > 1 ? 's are' : ' is'} scoring below 60%. Consider scheduling a review session.`
+                : "All students are on track! Keep up the great teaching."}
+            </p>
+            <div className="mt-8 flex gap-4">
+              <button className="bg-white text-[#1E2B5A] px-6 py-3 rounded-xl font-black text-[14px] hover:scale-105 transition-all">Schedule Review</button>
+              <button className="bg-white/10 text-white px-6 py-3 rounded-xl font-black text-[14px] border border-white/20 hover:bg-white/20 transition-all">Dismiss</button>
             </div>
           </div>
         </div>
-      </div>
+      </main>
+
+      <TeacherFooter />
     </div>
   );
 }
