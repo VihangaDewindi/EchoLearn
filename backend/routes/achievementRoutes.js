@@ -8,7 +8,7 @@ router.get("/leaderboard", async (req, res) => {
   try {
     const topUsers = await User.find({ role: "student" })
       .sort({ xp: -1 })
-      .limit(10)
+      .limit(50)
       .select("fullName xp");
     res.json(topUsers);
   } catch (err) {
