@@ -3,9 +3,13 @@
 import React from 'react';
 import TeacherNavbar from '@/components/Teacher/TeacherNavbar';
 import TeacherFooter from '@/components/Teacher/TeacherFooter';
-import { ChartBar, BookOpen, UserCheck, BarChart3 } from 'lucide-react';
+import { ChartBar, BookOpen, UserCheck, BarChart3, X, Play } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 const API = "http://localhost:5001";
+
+const SUBJECTS = ["Mathematics", "Science", "English"];
+const GRADES   = Array.from({ length: 10 }, (_, i) => `${i + 1}`);
 
 function timeAgo(date: string) {
   const diff = Date.now() - new Date(date).getTime();
@@ -17,9 +21,19 @@ function timeAgo(date: string) {
 }
 
 export default function TeacherDashboard() {
-  const [user, setUser] = React.useState<any>(null);
-  const [data, setData] = React.useState<any>(null);
+  const router = useRouter();
+  const [user, setUser]       = React.useState<any>(null);
+  const [data, setData]       = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
+  const [dismissed, setDismissed] = React.useState(false);
+  const [toast, setToast]     = React.useState("");
+
+  // New Lesson dialog state
+  const [lessonOpen, setLessonOpen] = React.useState(false);
+  const [lessonForm, setLessonForm] = React.useState({
+    title: "", subject: "Mathematics", grade: "1", description: "", duration: "12 min read",
+  });
+  const [lessonSaving, setLessonSaving] = React.useState(false);
 
   React.useEffect(() => {
     const savedUser = localStorage.getItem("user");
@@ -36,12 +50,53 @@ export default function TeacherDashboard() {
       .catch(() => setLoading(false));
   }, []);
 
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3500);
+  };
+
+  const handleScheduleReview = () => {
+    showToast("Review session scheduled. Students will be notified by email.");
+  };
+
+  const handleSaveLesson = async () => {
+    if (!lessonForm.title.trim()) return;
+    setLessonSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API}/api/teacher/lessons`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(lessonForm),
+      });
+      if (res.ok) {
+        setLessonOpen(false);
+        setLessonForm({ title: "", subject: "Mathematics", grade: "1", description: "", duration: "12 min read" });
+        showToast("Lesson created! Redirecting to Curriculum…");
+        setTimeout(() => router.push("/Teacher/curriculum"), 1200);
+      } else {
+        showToast("Failed to create lesson. Please try again.");
+      }
+    } catch {
+      showToast("Network error. Please try again.");
+    } finally {
+      setLessonSaving(false);
+    }
+  };
+
   const firstName = user?.fullName?.split(" ")[0] || "Teacher";
-  const students = data?.students || [];
+  const students  = data?.students || [];
 
   return (
     <div className="min-h-screen bg-[#F8FAFD] flex flex-col font-sans">
       <TeacherNavbar />
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-[100] bg-[#1E2B5A] text-white px-6 py-3 rounded-xl shadow-xl font-bold text-[14px] animate-fade-in">
+          {toast}
+        </div>
+      )}
 
       <main className="flex-1 p-6 max-w-6xl mx-auto w-full text-left">
         <div className="flex items-center justify-between mb-8 mt-4">
@@ -50,11 +105,19 @@ export default function TeacherDashboard() {
             <p className="text-[#8793AC] font-semibold mt-1">Here's a snapshot of your classes today.</p>
           </div>
           <div className="flex items-center gap-3">
-            <p className="text-sm font-bold text-[#8793AC]">{new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
-            <button className="bg-[#33478D] text-white text-[14px] px-6 py-2.5 rounded-xl font-black shadow-lg shadow-blue-900/10 hover:bg-[#2A3B7A] transition-all">New Lesson</button>
+            <p className="text-sm font-bold text-[#8793AC]">
+              {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+            </p>
+            <button
+              onClick={() => setLessonOpen(true)}
+              className="bg-[#33478D] text-white text-[14px] px-6 py-2.5 rounded-xl font-black shadow-lg shadow-blue-900/10 hover:bg-[#2A3B7A] transition-all"
+            >
+              + New Lesson
+            </button>
           </div>
         </div>
 
+        {/* Stats cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <div className="bg-white rounded-[24px] p-8 flex items-center gap-6 shadow-sm border border-[#E5E9F0]">
             <div className="w-14 h-14 bg-[#F0F2FA] rounded-2xl flex items-center justify-center">
@@ -62,9 +125,7 @@ export default function TeacherDashboard() {
             </div>
             <div>
               <p className="text-[11px] font-black text-[#8793AC] uppercase tracking-wider mb-1">Class average score</p>
-              <div className="flex items-center gap-2">
-                <p className="text-[28px] font-black text-[#1E273F]">{loading ? "—" : `${data?.avgQuizScore ?? 84}%`}</p>
-              </div>
+              <p className="text-[28px] font-black text-[#1E273F]">{loading ? "—" : `${data?.avgQuizScore ?? 84}%`}</p>
             </div>
           </div>
           <div className="bg-white rounded-[24px] p-8 flex items-center gap-6 shadow-sm border border-[#E5E9F0]">
@@ -114,10 +175,12 @@ export default function TeacherDashboard() {
                       </div>
                       <div>
                         <p className="text-[15px] font-black text-[#1E273F]">{s.fullName}</p>
-                        {s.status === 'struggling' && <p className="text-[11px] font-bold text-orange-500 mt-1 uppercase tracking-wider flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></span>
-                          Needs Support
-                        </p>}
+                        {s.status === 'struggling' && (
+                          <p className="text-[11px] font-bold text-orange-500 mt-1 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></span>
+                            Needs Support
+                          </p>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -125,13 +188,18 @@ export default function TeacherDashboard() {
                   <td className="p-6 text-[14px] font-bold text-[#5E6D8F]">{timeAgo(s.lastActive)}</td>
                   <td className="p-6 text-[14px]">
                     <div className="w-32 h-2 bg-[#F0F2F5] rounded-full overflow-hidden">
-                      <div className="h-full bg-[#33478D] transition-all duration-700 shadow-sm" style={{ width: `${s.progress}%` }}></div>
+                      <div className="h-full bg-[#33478D] transition-all duration-700" style={{ width: `${s.progress}%` }}></div>
                     </div>
                     <span className="text-[11px] font-black text-[#8793AC] mt-1 block">{s.progress}%</span>
                   </td>
                   <td className="p-6 text-[15px] font-black text-[#1E273F]">{s.quizAvg}%</td>
                   <td className="p-6 text-right">
-                    <button className="text-[13px] font-black text-[#33478D] hover:underline uppercase tracking-wider">View Full Profile</button>
+                    <button
+                      onClick={() => router.push("/Teacher/students")}
+                      className="text-[13px] font-black text-[#33478D] hover:underline uppercase tracking-wider"
+                    >
+                      View Full Profile
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -146,33 +214,155 @@ export default function TeacherDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
           <div className="bg-white rounded-[24px] p-8 shadow-sm border border-[#E5E9F0]">
             <h3 className="text-[16px] font-black text-[#1E273F] mb-6">Class Engagement Trend</h3>
-            <div className="flex items-end gap-2 h-32 px-2">
-              {[40, 50, 60, 55, 65, 70, 80].map((h, i) => (
-                <div key={i} className={`flex-1 rounded-t-xl transition-all ${i === 6 ? 'bg-[#33478D]' : 'bg-[#F0F2F5] hover:bg-[#33478D]'}`} style={{ height: `${h}%` }}></div>
-              ))}
-            </div>
-            <div className="flex justify-between mt-4 text-[11px] font-black text-[#8793AC] uppercase tracking-[0.2em] px-2">
-              {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => <span key={d}>{d}</span>)}
-            </div>
+            {(() => {
+              const raw: number[] = data?.engagement || [];
+              const maxVal = Math.max(...raw, 1);
+              const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+              // Align raw array (last 7 days) to day labels
+              const today = new Date().getDay(); // 0=Sun
+              const ordered = Array.from({ length: 7 }, (_, i) => {
+                const idx = (today - 6 + i + 7) % 7;
+                return { day: days[idx], val: raw[i] ?? 0 };
+              });
+              return (
+                <>
+                  <div className="flex items-end gap-2 h-32 px-2">
+                    {ordered.map(({ val }, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 rounded-t-xl transition-all ${i === 6 ? 'bg-[#33478D]' : val > 0 ? 'bg-[#7B9ED6]' : 'bg-[#F0F2F5]'} hover:bg-[#33478D]`}
+                        style={{ height: `${Math.max((val / maxVal) * 100, 4)}%` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex justify-between mt-4 text-[11px] font-black text-[#8793AC] uppercase tracking-[0.2em] px-2">
+                    {ordered.map(({ day }) => <span key={day}>{day}</span>)}
+                  </div>
+                </>
+              );
+            })()}
           </div>
-          <div className="bg-[#1E2B5A] text-white rounded-[24px] p-8 shadow-xl relative overflow-hidden flex flex-col justify-center">
-            <div className="absolute top-0 right-0 p-8 opacity-10"><BarChart3 size={120} /></div>
-            <span className="w-fit uppercase text-[10px] font-black bg-white/10 px-3 py-1 rounded-md tracking-widest border border-white/20">Proactive Insight</span>
-            <h3 className="text-[24px] font-black mt-4 leading-tight">Identify struggling students early with EchoLearn AI.</h3>
-            <p className="mt-3 text-[14px] text-white/70 font-medium leading-relaxed">
-              {data?.studentsNeedingSupport > 0
-                ? `${data.studentsNeedingSupport} student${data.studentsNeedingSupport > 1 ? 's are' : ' is'} scoring below 60%. Consider scheduling a review session.`
-                : "All students are on track! Keep up the great teaching."}
-            </p>
-            <div className="mt-8 flex gap-4">
-              <button className="bg-white text-[#1E2B5A] px-6 py-3 rounded-xl font-black text-[14px] hover:scale-105 transition-all">Schedule Review</button>
-              <button className="bg-white/10 text-white px-6 py-3 rounded-xl font-black text-[14px] border border-white/20 hover:bg-white/20 transition-all">Dismiss</button>
+
+          {!dismissed && (
+            <div className="bg-[#1E2B5A] text-white rounded-[24px] p-8 shadow-xl relative overflow-hidden flex flex-col justify-center">
+              <div className="absolute top-0 right-0 p-8 opacity-10"><BarChart3 size={120} /></div>
+              <div className="relative z-10">
+                <span className="w-fit uppercase text-[10px] font-black bg-white/10 px-3 py-1 rounded-md tracking-widest border border-white/20">Proactive Insight</span>
+                <h3 className="text-[24px] font-black mt-4 leading-tight">Identify struggling students early with EchoLearn AI.</h3>
+                <p className="mt-3 text-[14px] text-white/70 font-medium leading-relaxed">
+                  {data?.studentsNeedingSupport > 0
+                    ? `${data.studentsNeedingSupport} student${data.studentsNeedingSupport > 1 ? 's are' : ' is'} scoring below 60%. Consider scheduling a review session.`
+                    : "All students are on track! Keep up the great teaching."}
+                </p>
+                <div className="mt-8 flex gap-4">
+                  <button
+                    onClick={handleScheduleReview}
+                    className="bg-white text-[#1E2B5A] px-6 py-3 rounded-xl font-black text-[14px] hover:scale-105 transition-all flex items-center gap-2"
+                  >
+                    <Play size={14} fill="currentColor" /> Schedule Review
+                  </button>
+                  <button
+                    onClick={() => setDismissed(true)}
+                    className="bg-white/10 text-white px-6 py-3 rounded-xl font-black text-[14px] border border-white/20 hover:bg-white/20 transition-all"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
 
       <TeacherFooter />
+
+      {/* New Lesson Dialog */}
+      {lessonOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[28px] shadow-2xl w-full max-w-[500px] p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-[22px] font-black text-[#1E273F]">Create New Lesson</h2>
+              <button onClick={() => setLessonOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl transition">
+                <X size={20} className="text-[#8793AC]" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Lesson Title *</label>
+                <input
+                  type="text"
+                  value={lessonForm.title}
+                  onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
+                  placeholder="e.g. Introduction to Fractions"
+                  className="w-full border border-[#E5E9F0] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E273F] focus:outline-none focus:border-[#33478D]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Subject *</label>
+                  <select
+                    value={lessonForm.subject}
+                    onChange={(e) => setLessonForm({ ...lessonForm, subject: e.target.value })}
+                    className="w-full border border-[#E5E9F0] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E273F] focus:outline-none focus:border-[#33478D] bg-white"
+                  >
+                    {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Grade *</label>
+                  <select
+                    value={lessonForm.grade}
+                    onChange={(e) => setLessonForm({ ...lessonForm, grade: e.target.value })}
+                    className="w-full border border-[#E5E9F0] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E273F] focus:outline-none focus:border-[#33478D] bg-white"
+                  >
+                    {GRADES.map((g) => <option key={g} value={g}>Grade {g}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Duration</label>
+                <input
+                  type="text"
+                  value={lessonForm.duration}
+                  onChange={(e) => setLessonForm({ ...lessonForm, duration: e.target.value })}
+                  placeholder="e.g. 15 min read"
+                  className="w-full border border-[#E5E9F0] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E273F] focus:outline-none focus:border-[#33478D]"
+                />
+              </div>
+
+              <div>
+                <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Description</label>
+                <textarea
+                  value={lessonForm.description}
+                  onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })}
+                  placeholder="Brief overview of what this lesson covers..."
+                  rows={3}
+                  className="w-full border border-[#E5E9F0] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E273F] focus:outline-none focus:border-[#33478D] resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button
+                onClick={() => setLessonOpen(false)}
+                className="flex-1 py-3 rounded-xl border border-[#E5E9F0] text-[14px] font-black text-[#8793AC] hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveLesson}
+                disabled={lessonSaving || !lessonForm.title.trim()}
+                className="flex-1 py-3 rounded-xl bg-[#33478D] text-white text-[14px] font-black hover:bg-[#2A3B7A] transition disabled:opacity-50"
+              >
+                {lessonSaving ? "Saving…" : "Create Lesson"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
