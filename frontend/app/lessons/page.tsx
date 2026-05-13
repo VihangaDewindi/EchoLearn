@@ -126,9 +126,10 @@ const stateRef = useRef<{
     const recognition = getSpeechRecognition();
     if (!recognition) return;
 
-    recognition.continuous     = true;
-    recognition.interimResults = false;
-    recognition.lang           = "en-US";
+    recognition.continuous      = true;
+    recognition.interimResults  = false;
+    recognition.lang            = "en-US";
+    recognition.maxAlternatives = 5;
 
     // ── Low-level helpers ──────────────────────────────────────────────────
     const stopRec  = () => { try { recognition.stop(); } catch {} };
@@ -139,7 +140,7 @@ const stateRef = useRef<{
       stopRec();
       speak(text, () => {
         onEnd?.();
-        setTimeout(startRec, 400);
+        setTimeout(startRec, 150);
       });
     };
 
@@ -167,7 +168,11 @@ const stateRef = useRef<{
 
     // ── Command handler ────────────────────────────────────────────────────
     recognition.onresult = (event: any) => {
-      const command = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+      const lastResult = event.results[event.results.length - 1];
+      // Merge all alternatives into one string for broader matching
+      const command = Array.from({ length: lastResult.length }, (_, i) =>
+        lastResult[i].transcript.toLowerCase().trim()
+      ).join(" | ");
       const current = stateRef.current;
       console.log(`Lessons voice [${current.voiceStep}] heard:`, command);
 
@@ -183,16 +188,17 @@ const stateRef = useRef<{
 
       if (current.voiceStep === "GRADE") {
         const numberWords: Record<string, number> = {
-          one: 1, two: 2, three: 3, four: 4, five: 5,
-          six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+          one: 1, won: 1, two: 2, to: 2, too: 2, three: 3, free: 3, four: 4, fore: 4, for: 4,
+          five: 5, six: 6, seven: 7, eight: 8, ate: 8, nine: 9, ten: 10,
         };
         let num: number | null = null;
-        const digitMatch = command.match(/\d+/);
+        const digitMatch = command.match(/\b(\d+)\b/);
         if (digitMatch) {
-          num = parseInt(digitMatch[0]);
+          num = parseInt(digitMatch[1]);
         } else {
           for (const [word, val] of Object.entries(numberWords)) {
-            if (command.includes(word)) { num = val; break; }
+            // Only match whole word to avoid "five" in "archive"
+            if (new RegExp(`\\b${word}\\b`).test(command)) { num = val; break; }
           }
         }
 
@@ -215,7 +221,13 @@ const stateRef = useRef<{
       }
 
       if (current.voiceStep === "SUBJECT") {
-        const found = subjects.find(s => command.includes(s.name.toLowerCase()));
+        // Also catch common mis-recognitions: "maths", "math", "science", "english", "english language"
+        const found = subjects.find(s =>
+          command.includes(s.name.toLowerCase()) ||
+          (s.name === "Mathematics" && (command.includes("math") || command.includes("maths") || command.includes("mathematic"))) ||
+          (s.name === "Science" && command.includes("sci")) ||
+          (s.name === "English" && (command.includes("english") || command.includes("inglés") || command.includes("language")))
+        );
         if (found) {
           setVoiceSubject(found.name);
           setActiveSubject(found.name);
@@ -264,15 +276,12 @@ const stateRef = useRef<{
 
       if (current.voiceStep === "READY") {
         const wantsStart =
-          command.includes("start lesson") ||
-          command.includes("start the lesson") ||
-          command.includes("begin lesson") ||
-          command.includes("begin the lesson") ||
-          command === "start" ||
-          command === "begin" ||
-          command === "yes" ||
-          command === "okay" ||
-          command === "ok";
+          command.includes("start") ||
+          command.includes("begin") ||
+          command.includes("yes") ||
+          command.includes("okay") ||
+          command.includes(" ok ") ||
+          command.startsWith("ok");
 
         if (wantsStart) {
           const matched = voiceLessonsRef.current[0] || current.lessons[0];
