@@ -32,15 +32,14 @@ function QuizContent() {
   const [isListening, setIsListening]       = useState(false);
   const [statusHint, setStatusHint]         = useState("Loading quiz…");
 
-  // Refs for stale-closure-free voice handlers
   const questionsRef    = useRef<Question[]>([]);
   const currentIdxRef   = useRef(0);
   const scoreRef        = useRef(0);
   const hasStartedRef   = useRef(false);
   const keepListeningRef = useRef(true);
   const isSpeakingRef   = useRef(false);
-  // INTRO → AWAITING_ANSWER → FEEDBACK → DONE
-  const voiceStepRef    = useRef<"INTRO" | "AWAITING_ANSWER" | "FEEDBACK" | "DONE">("INTRO");
+  // INTRO → READING_QUESTION → AWAITING_ANSWER → FEEDBACK → DONE
+  const voiceStepRef    = useRef<"INTRO" | "READING_QUESTION" | "AWAITING_ANSWER" | "FEEDBACK" | "DONE">("INTRO");
   const recognitionRef  = useRef<any>(null);
 
   useEffect(() => {
@@ -49,12 +48,26 @@ function QuizContent() {
         const res = await fetch("http://localhost:5001/api/ai/generate-quiz", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ topic: lessonSlug.replace(/-/g, " ") }),
+          body: JSON.stringify({ lessonSlug }),
         });
         const data = await res.json();
         if (data.quiz) {
-          setQuestions(data.quiz);
-          questionsRef.current = data.quiz;
+          // Ensure exactly one correct answer per question (guards against AI hallucinations)
+          const sanitized: Question[] = (data.quiz as Question[]).map(q => {
+            const correctCount = q.options.filter(o => o.isCorrect).length;
+            if (correctCount <= 1) return q;
+            let foundFirst = false;
+            return {
+              ...q,
+              options: q.options.map(o => {
+                if (o.isCorrect && !foundFirst) { foundFirst = true; return o; }
+                if (o.isCorrect) return { ...o, isCorrect: false };
+                return o;
+              }),
+            };
+          });
+          setQuestions(sanitized);
+          questionsRef.current = sanitized;
         }
       } catch (err) {
         console.error("Failed to fetch quiz:", err);
@@ -65,7 +78,7 @@ function QuizContent() {
     fetchQuiz();
   }, [lessonSlug]);
 
-  // ── Voice engine (single effect, starts when questions load) ────────────────
+  // ── Voice engine ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (loading || questionsRef.current.length === 0) return;
 
@@ -73,9 +86,9 @@ function QuizContent() {
     if (!recognition) return;
     recognitionRef.current = recognition;
 
-    recognition.continuous     = true;
-    recognition.interimResults = false;
-    recognition.lang           = "en-US";
+    recognition.continuous      = true;
+    recognition.interimResults  = false;
+    recognition.lang            = "en-US";
     recognition.maxAlternatives = 5;
 
     const stopListening  = () => { try { recognition.stop(); } catch {} };
@@ -84,22 +97,24 @@ function QuizContent() {
       try { recognition.start(); } catch {}
     };
 
-    // Extract a letter answer from any transcript variant (including phonetic mishearings)
+    // Comprehensive letter extraction — handles phonetic variants and accidental words
     const extractLetter = (t: string): string | null => {
-      if (t === "a" || t === "ay" || t.startsWith("a ") || t.endsWith(" a") || t.includes("option a") || t.includes("answer a") || t.includes("select a") || t.includes("choose a")) return "A";
-      if (t === "b" || t === "bee" || t === "be" || t.startsWith("b ") || t.endsWith(" b") || t.includes("option b") || t.includes("answer b") || t.includes("select b") || t.includes("choose b")) return "B";
-      if (t === "c" || t === "see" || t === "sea" || t.startsWith("c ") || t.endsWith(" c") || t.includes("option c") || t.includes("answer c") || t.includes("select c") || t.includes("choose c")) return "C";
-      if (t === "d" || t === "dee" || t.startsWith("d ") || t.endsWith(" d") || t.includes("option d") || t.includes("answer d") || t.includes("select d") || t.includes("choose d")) return "D";
+      if (/^[a]$/i.test(t) || t === "ay" || t === "aye" || t === "eh" || t === "hey" || t === "ace" || t === "the letter a" || t === "letter a" || t.startsWith("a ") || t.endsWith(" a") || t.includes("option a") || t.includes("answer a") || t.includes("select a") || t.includes("choose a")) return "A";
+      if (/^[b]$/i.test(t) || t === "bee" || t === "be" || t === "bi" || t === "buy" || t === "the letter b" || t === "letter b" || t.startsWith("b ") || t.endsWith(" b") || t.includes("option b") || t.includes("answer b") || t.includes("select b") || t.includes("choose b")) return "B";
+      if (/^[c]$/i.test(t) || t === "see" || t === "sea" || t === "si" || t === "si" || t === "the letter c" || t === "letter c" || t.startsWith("c ") || t.endsWith(" c") || t.includes("option c") || t.includes("answer c") || t.includes("select c") || t.includes("choose c")) return "C";
+      if (/^[d]$/i.test(t) || t === "dee" || t === "de" || t === "di" || t === "the letter d" || t === "letter d" || t.startsWith("d ") || t.endsWith(" d") || t.includes("option d") || t.includes("answer d") || t.includes("select d") || t.includes("choose d")) return "D";
       return null;
     };
 
     const speakThen = (text: string, onEnd?: () => void) => {
       isSpeakingRef.current = true;
-      stopListening();
+      // Do NOT stop recognition — keep it running so it's ready the instant TTS ends.
+      // voiceStepRef gates commands: nothing is processed until AWAITING_ANSWER.
       speak(text, () => {
         isSpeakingRef.current = false;
         onEnd?.();
-        if (keepListeningRef.current) setTimeout(startListening, 400);
+        // Restart in case the browser stopped recognition while TTS was playing
+        if (keepListeningRef.current) setTimeout(startListening, 50);
       });
     };
 
@@ -112,14 +127,20 @@ function QuizContent() {
       setSelectedLetter(null);
       setShowResult(false);
       setIsCorrect(false);
-      voiceStepRef.current = "AWAITING_ANSWER";
+      // Keep READING_QUESTION until TTS ends — prevents premature answer detection
+      voiceStepRef.current = "READING_QUESTION";
+      setStatusHint("Reading question…");
 
       const q = qs[idx];
-      const opts = q.options.map(o => `${o.letter}: ${o.title}`).join(". ");
-      const text = `Question ${idx + 1} of ${qs.length}. ${q.question}. ${opts}. Say A, B, C, or D to answer.`;
+      const opts = q.options.map(o => `${o.letter}, ${o.title}`).join(". ");
+      const text = `Question ${idx + 1}. ${q.question}. ${opts}.`;
 
-      setStatusHint(`Listening for A, B, C, or D…`);
-      speakThen(text);
+      speakThen(text, () => {
+        voiceStepRef.current = "AWAITING_ANSWER";
+        setStatusHint("Say A, B, C, or D…");
+        // Nudge recognition to ensure it's active for the student's answer
+        if (keepListeningRef.current) setTimeout(startListening, 100);
+      });
     };
 
     const handleAnswer = (letter: string) => {
@@ -134,23 +155,23 @@ function QuizContent() {
       if (!choice) { voiceStepRef.current = "AWAITING_ANSWER"; return; }
 
       const correct = choice.isCorrect;
-      if (correct) {
-        scoreRef.current += 1;
-      }
+      if (correct) scoreRef.current += 1;
+
       setSelectedLetter(letter.toUpperCase());
       setShowResult(true);
       setIsCorrect(correct);
 
       window.speechSynthesis.cancel();
 
+      const correct_opt = q.options.find(o => o.isCorrect);
       const feedback = correct
-        ? `That's correct! Great job.`
-        : `Not quite. The correct answer was ${q.options.find(o => o.isCorrect)?.letter}: ${q.options.find(o => o.isCorrect)?.title}.`;
+        ? `Correct!`
+        : `No. Answer was ${correct_opt?.letter}: ${correct_opt?.title}.`;
 
       const nextIdx = idx + 1;
       if (nextIdx < qs.length) {
-        speakThen(`${feedback} Moving on.`, () => {
-          setTimeout(() => readQuestion(nextIdx), 400);
+        speakThen(feedback, () => {
+          setTimeout(() => readQuestion(nextIdx), 500);
         });
       } else {
         voiceStepRef.current = "DONE";
@@ -193,7 +214,6 @@ function QuizContent() {
     recognition.onend   = () => {
       setIsListening(false);
       if (!keepListeningRef.current) return;
-      // TTS-aware restart: don't start recognition while TTS is speaking
       const tryRestart = () => {
         if (window.speechSynthesis.speaking) { setTimeout(tryRestart, 500); return; }
         if (keepListeningRef.current && !isSpeakingRef.current) startListening();
@@ -214,11 +234,17 @@ function QuizContent() {
       console.log(`[Quiz voice | step=${voiceStepRef.current}] heard:`, cmd);
 
       if (voiceStepRef.current === "AWAITING_ANSWER") {
-        // Check ALL alternatives for a letter answer (handles phonetic misrecognitions)
+        // Check ALL alternatives for a letter answer
         for (let i = 0; i < lastResult.length; i++) {
           const alt = lastResult[i].transcript.toLowerCase().trim();
           const letter = extractLetter(alt);
           if (letter) { handleAnswer(letter); return; }
+        }
+        // Broad fallback: find any isolated A/B/C/D word in any alternative
+        for (let i = 0; i < lastResult.length; i++) {
+          const alt = lastResult[i].transcript.toLowerCase().trim();
+          const m = alt.match(/\b([abcd])\b/i);
+          if (m) { handleAnswer(m[1].toUpperCase()); return; }
         }
         if (cmd.includes("repeat") || cmd.includes("again")) {
           window.speechSynthesis.cancel();
@@ -233,7 +259,7 @@ function QuizContent() {
           return;
         }
         if (cmd.includes("where am i")) {
-          speakThen(`You are on question ${currentIdxRef.current + 1} of ${questionsRef.current.length}. ${questionsRef.current[currentIdxRef.current].question}`);
+          speakThen(`Question ${currentIdxRef.current + 1} of ${questionsRef.current.length}.`);
           return;
         }
       }
@@ -246,11 +272,13 @@ function QuizContent() {
       voiceStepRef.current = "INTRO";
       setStatusHint("Preparing quiz…");
       speakThen(
-        `Welcome to the quiz for ${lessonTitle}. There are ${questionsRef.current.length} questions. I'll read each one aloud. Say the letter A, B, C, or D to answer. Let's begin!`,
-        () => setTimeout(() => readQuestion(0), 400)
+        `Quiz: ${lessonTitle}. Say A, B, C, or D for each question.`,
+        () => setTimeout(() => readQuestion(0), 300)
       );
     };
 
+    // Start recognition immediately so it's already running when first question TTS ends
+    startListening();
     startAssistant();
 
     const unlock = async () => { await tryUnlockAudio(); startAssistant(); };
@@ -259,7 +287,7 @@ function QuizContent() {
 
     return () => {
       keepListeningRef.current = false;
-      hasStartedRef.current    = false;
+      // Do NOT reset hasStartedRef — prevents double-start in Strict Mode re-mount
       window.removeEventListener("click",   unlock);
       window.removeEventListener("keydown", unlock);
       try {
@@ -284,7 +312,7 @@ function QuizContent() {
     if (!choice) return;
 
     const correct = choice.isCorrect;
-    if (correct) { scoreRef.current += 1; }
+    if (correct) scoreRef.current += 1;
     setSelectedLetter(letter);
     setShowResult(true);
     setIsCorrect(correct);
@@ -292,13 +320,14 @@ function QuizContent() {
     window.speechSynthesis.cancel();
     try { recognitionRef.current?.stop(); } catch {}
 
+    const co = q.options.find(o => o.isCorrect);
     const feedback = correct
-      ? `Correct! Well done.`
-      : `Not quite. The answer was ${q.options.find(o => o.isCorrect)?.letter}: ${q.options.find(o => o.isCorrect)?.title}.`;
+      ? `Correct!`
+      : `No. Answer: ${co?.letter}: ${co?.title}.`;
 
     const nextIdx = idx + 1;
     if (nextIdx < qs.length) {
-      speak(`${feedback} Moving on.`, () => {
+      speak(feedback, () => {
         isSpeakingRef.current = false;
         setTimeout(() => {
           const qi = currentIdxRef.current + 1;
@@ -307,14 +336,16 @@ function QuizContent() {
           setSelectedLetter(null);
           setShowResult(false);
           setIsCorrect(false);
-          voiceStepRef.current = "AWAITING_ANSWER";
+          voiceStepRef.current = "READING_QUESTION";
           const nq = qs[qi];
-          const opts = nq.options.map(o => `${o.letter}: ${o.title}`).join(". ");
-          speak(`Question ${qi + 1} of ${qs.length}. ${nq.question}. ${opts}. Say A, B, C, or D to answer.`, () => {
+          const opts = nq.options.map(o => `${o.letter}, ${o.title}`).join(". ");
+          speak(`Question ${qi + 1}. ${nq.question}. ${opts}.`, () => {
             isSpeakingRef.current = false;
+            voiceStepRef.current = "AWAITING_ANSWER";
+            setStatusHint("Say A, B, C, or D…");
             setTimeout(() => { try { recognitionRef.current?.start(); } catch {} }, 400);
           });
-        }, 400);
+        }, 500);
       });
     } else {
       voiceStepRef.current = "DONE";
@@ -346,7 +377,6 @@ function QuizContent() {
     }
   };
 
-  // Manual "Next" button — only advances UI, voice already handled it
   const advanceManually = () => {
     const qs  = questionsRef.current;
     const idx = currentIdxRef.current;
@@ -357,17 +387,18 @@ function QuizContent() {
       setSelectedLetter(null);
       setShowResult(false);
       setIsCorrect(false);
-      voiceStepRef.current = "AWAITING_ANSWER";
-      setStatusHint("Listening for A, B, C, or D…");
+      voiceStepRef.current = "READING_QUESTION";
+      setStatusHint("Reading question…");
       window.speechSynthesis.cancel();
       const nq   = qs[next];
-      const opts = nq.options.map(o => `${o.letter}: ${o.title}`).join(". ");
-      speak(`Question ${next + 1} of ${qs.length}. ${nq.question}. ${opts}. Say A, B, C, or D to answer.`, () => {
+      const opts = nq.options.map(o => `${o.letter}, ${o.title}`).join(". ");
+      speak(`Question ${next + 1}. ${nq.question}. ${opts}.`, () => {
         isSpeakingRef.current = false;
+        voiceStepRef.current = "AWAITING_ANSWER";
+        setStatusHint("Say A, B, C, or D…");
         setTimeout(() => { try { recognitionRef.current?.start(); } catch {} }, 400);
       });
     } else {
-      // Last question — go to results
       const submitAndGo = async () => {
         const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
         try {
@@ -406,9 +437,9 @@ function QuizContent() {
     );
   }
 
-  const currentQ       = questions[currentIdx];
-  const progressPct    = ((currentIdx + 1) / questions.length) * 100;
-  const minsRemaining  = Math.max(1, Math.round((questions.length - currentIdx) * 1.2));
+  const currentQ      = questions[currentIdx];
+  const progressPct   = ((currentIdx + 1) / questions.length) * 100;
+  const minsRemaining = Math.max(1, Math.round((questions.length - currentIdx) * 1.2));
 
   return (
     <div className="min-h-screen bg-[#F5F8FA] flex flex-col font-sans">
@@ -454,7 +485,9 @@ function QuizContent() {
             <div className={`mb-6 px-6 py-4 rounded-[14px] font-bold text-[16px] ${
               isCorrect ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
             }`}>
-              {isCorrect ? "✓ Correct! Well done." : `✗ Not quite — the correct answer was ${currentQ.options.find(o => o.isCorrect)?.letter}: ${currentQ.options.find(o => o.isCorrect)?.title}.`}
+              {isCorrect
+                ? "✓ Correct! Well done."
+                : `✗ Not quite — the correct answer was ${currentQ.options.find(o => o.isCorrect)?.letter}: ${currentQ.options.find(o => o.isCorrect)?.title}.`}
             </div>
           )}
 
@@ -468,9 +501,9 @@ function QuizContent() {
               let border = "border-[#E7ECF3]";
               let bg     = "bg-white";
               if (showResult) {
-                if (isSelected)         { border = option.isCorrect ? "border-green-500" : "border-red-500"; bg = option.isCorrect ? "bg-green-50" : "bg-red-50"; }
-                else if (option.isCorrect) { border = "border-green-400"; bg = "bg-green-50/60"; }
-              } else if (isSelected)    { border = "border-[#33478D]"; bg = "bg-[#F0F4FF]"; }
+                if (isSelected)                         { border = option.isCorrect ? "border-green-500" : "border-red-500"; bg = option.isCorrect ? "bg-green-50" : "bg-red-50"; }
+                else if (option.isCorrect && !isCorrect) { border = "border-green-400"; bg = "bg-green-50/60"; }
+              } else if (isSelected)                    { border = "border-[#33478D]"; bg = "bg-[#F0F4FF]"; }
 
               return (
                 <button
@@ -481,7 +514,7 @@ function QuizContent() {
                     !showResult ? "hover:border-[#D0D7E7] hover:shadow-sm" : ""
                   }`}
                 >
-                  <div className="flex items-center gap-4 mb-4">
+                  <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-[16px] flex-shrink-0 ${
                       showResult && option.isCorrect ? "bg-green-500 text-white" :
                       showResult && isSelected       ? "bg-red-400 text-white"   : "bg-[#F3F6FA] text-[#4E5A7B]"
@@ -490,7 +523,6 @@ function QuizContent() {
                     </div>
                     <h3 className="text-[17px] font-black text-[#1F2942]">{option.title}</h3>
                   </div>
-                  <p className="text-[14px] text-[#6E7892] leading-[1.6] pl-14">{option.description}</p>
                 </button>
               );
             })}
