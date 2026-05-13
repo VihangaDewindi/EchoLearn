@@ -19,7 +19,6 @@ const IMAGES = {
 const mk = (slug, title, subject, grade, unit, level, duration, description, blocks) => ({
   slug, title, subject, grade, unit, level, duration, description,
   image: IMAGES[subject] || "",
-  quizRoute: `/quiz?lesson=${slug}`,
   progress: 0,
   blocks,
 });
@@ -722,6 +721,9 @@ async function seed() {
   try {
     await mongoose.connect(MONGO_URI);
     console.log("Connected to MongoDB:", MONGO_URI);
+
+    await Lesson.deleteMany({});
+    console.log("Old lessons deleted");
 
     let created = 0;
     let updated = 0;
