@@ -2,6 +2,7 @@ const router = require("express").Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
+const ActivityLog = require("../models/ActivityLog");
 
 // Utility function to validate email format
 const isValidEmail = (email) => {
@@ -93,6 +94,14 @@ router.post("/login", async (req, res) => {
       process.env.JWT_SECRET || "fallback_secret_key",
       { expiresIn: "1d" }
     );
+
+    // Update lastActive and write activity log (fire-and-forget, don't block response)
+    User.findByIdAndUpdate(user._id, { lastActive: new Date() }).catch(() => {});
+    ActivityLog.create({
+      userId: user._id,
+      type: "login",
+      title: `${user.fullName} logged in`,
+    }).catch(() => {});
 
     res.json({
       token,
