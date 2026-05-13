@@ -14,6 +14,7 @@ const API = "http://localhost:5001";
 export default function Dashboard() {
   const [user, setUser]       = useState<any>(null);
   const [progress, setProgress] = useState<any>(null);
+  const [weeklyPlan, setWeeklyPlan] = useState<{day: string; label: string; value: number; color: string}[]>([]);
   const [isListening, setIsListening] = useState(false);
   const router = useRouter();
 
@@ -24,14 +25,35 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         const saved = localStorage.getItem("user");
-        if (saved) {
-          setUser(JSON.parse(saved));
-        } else {
-          const r = await fetch(`${API}/api/user`);
-          setUser(await r.json());
+        const parsedUser = saved ? JSON.parse(saved) : null;
+        if (parsedUser) setUser(parsedUser);
+
+        const token = localStorage.getItem("token");
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const pr = await fetch(`${API}/api/progress`, { headers });
+        const prData = await pr.json();
+        setProgress(prData);
+        if (prData.xp !== undefined) {
+          setUser((u: any) => u ? { ...u, xp: prData.xp } : u);
         }
-        const pr = await fetch(`${API}/api/progress`);
-        setProgress(await pr.json());
+
+        // Fetch real lessons for weekly plan
+        const gradeNum = Math.min(10, Math.max(1, parsedUser?.level || 3));
+        const grade = encodeURIComponent(`Grade ${gradeNum}`);
+        const [mathL, sciL, engL] = await Promise.all([
+          fetch(`${API}/api/lessons?subject=Mathematics&grade=${grade}`).then(r => r.json()).catch(() => []),
+          fetch(`${API}/api/lessons?subject=Science&grade=${grade}`).then(r => r.json()).catch(() => []),
+          fetch(`${API}/api/lessons?subject=English&grade=${grade}`).then(r => r.json()).catch(() => []),
+        ]);
+        const trunc = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + "…" : s;
+        const plan = [
+          { day: "Mon", label: `Mon: ${trunc(mathL[0]?.title || "Mathematics", 18)}`, value: prData.math ?? 0, color: "#E7873C" },
+          { day: "Tue", label: `Tue: ${trunc(sciL[0]?.title  || "Science",     18)}`, value: prData.science ?? 0, color: "#5AAF7B" },
+          { day: "Wed", label: `Wed: ${trunc(engL[0]?.title  || "English",     18)}`, value: prData.english ?? 0, color: "#A15EFF" },
+          { day: "Thu", label: `Thu: ${trunc(mathL[1]?.title || mathL[0]?.title || "Mathematics", 18)}`, value: prData.math ?? 0, color: "#E7873C" },
+        ];
+        setWeeklyPlan(plan);
       } catch (err) {
         console.error("API error:", err);
       }
@@ -91,17 +113,18 @@ export default function Dashboard() {
       const command = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
       console.log("Dashboard heard:", command);
 
-      // resume lesson — broad matching
+      // resume lesson — navigate to actual last lesson, not hardcoded slug
       if (
         command.includes("resume") ||
         command.includes("continue lesson") ||
         command.includes("continue learning")
       ) {
+        const slug = progress?.lastLesson?.slug || "intro-to-fractions";
         keepListening = false;
         stopListening();
         speakAndResume("Sure! Resuming your lesson now.", () => {
           localStorage.setItem("voiceStart", "true");
-          router.push("/lessons/intro-to-fractions");
+          router.push(`/lessons/${slug}`);
         });
         return;
       }
@@ -206,14 +229,25 @@ export default function Dashboard() {
             <h1 className="text-[26px] md:text-[30px] font-extrabold text-[#27314D] tracking-[-0.02em]">
               Welcome back, {user.fullName}! 👋
             </h1>
-            <p className="mt-2 text-[15px] text-[#677189] font-medium">
-              You're doing great! You are{" "}
-              <span className="text-[#34498D] font-semibold">250 points</span> away from Level 10.
-            </p>
+            {(() => {
+              const xp = progress?.xp ?? user?.xp ?? 0;
+              const nextMilestone = Math.max(100, Math.ceil((xp + 1) / 100) * 100);
+              const xpNeeded = nextMilestone - xp;
+              return (
+                <p className="mt-2 text-[15px] text-[#677189] font-medium">
+                  You're doing great! You've earned{" "}
+                  <span className="text-[#34498D] font-semibold">{xp} XP</span>{" "}
+                  from your quizzes.{" "}
+                  {xpNeeded > 0
+                    ? <>{`Just `}<span className="text-[#34498D] font-semibold">{xpNeeded} XP</span>{` to your next milestone!`}</>
+                    : "Keep it up!"}
+                </p>
+              );
+            })()}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 min-w-fit">
-            <TopStatCard title="CURRENT LEVEL" value={user.level ?? 9} />
-            <TopStatCard title="TOTAL XP"       value={user.xp    ?? "2,450"} />
+            <TopStatCard title="CURRENT LEVEL" value={user.level ?? 1} />
+            <TopStatCard title="TOTAL XP"       value={(progress?.xp ?? user.xp ?? 0).toLocaleString()} />
             <TopGoalCard />
           </div>
         </div>
@@ -226,59 +260,69 @@ export default function Dashboard() {
 
             {/* Continue Learning */}
             <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[18px] font-extrabold text-[#27314D]">Continue Learning</h2>
-                <button className="text-[14px] font-bold text-[#34498D] hover:underline">View Library</button>
-              </div>
-              <div className="bg-white rounded-[22px] overflow-hidden border border-[#E7EAF2] shadow-[0_4px_18px_rgba(24,39,75,0.04)] grid grid-cols-1 md:grid-cols-[230px_minmax(0,1fr)]">
-                <div className="bg-[#98A089] min-h-[240px] flex flex-col items-center justify-center text-white">
-                  <div className="text-[18px] tracking-[0.25em] font-extrabold">LESSON</div>
-                  <div className="text-[11px] opacity-80 mt-2 uppercase tracking-[0.12em]">Gaffenworki</div>
-                </div>
-                <div className="p-6 md:p-7">
-                  <div className="flex items-center gap-3 text-[12px] font-bold">
-                    <span className="px-3 py-1 rounded-md bg-[#EEF2FF] text-[#3C4E92] uppercase tracking-wide">Mathematics</span>
-                    <span className="text-[#8B94A8] font-semibold">Unit 3: Fractions</span>
-                  </div>
-                  <h3 className="mt-4 text-[24px] font-extrabold text-[#27314D] tracking-[-0.02em]">
-                    Introduction to Fractions
-                  </h3>
-                  <p className="mt-3 text-[15px] leading-7 text-[#667085] max-w-[680px]">
-                    Master the basics of numerators, denominators, and equivalent fractions through visual puzzles.
-                  </p>
-                  <div className="mt-6">
-                    <div className="flex items-center justify-between text-[14px] font-bold text-[#3A4566] mb-2">
-                      <span>Progress</span><span>{progress.math}%</span>
+              {(() => {
+                const ll = progress.lastLesson;
+                const slug    = ll?.slug    || "intro-to-fractions";
+                const title   = ll?.title   || "Introduction to Fractions";
+                const subject = ll?.subject || "Mathematics";
+                const prog    = ll?.progress ?? progress.math ?? 0;
+                const subjectColors: Record<string, string> = {
+                  Mathematics: "bg-[#3B4FA0]",
+                  Science:     "bg-[#2E7D5B]",
+                  English:     "bg-[#7C3D9E]",
+                };
+                const bgColor = subjectColors[subject] || "bg-[#98A089]";
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-[18px] font-extrabold text-[#27314D]">Continue Learning</h2>
                     </div>
-                    <div className="h-[7px] rounded-full bg-[#E8EBF3] overflow-hidden">
-                      <div className="h-full rounded-full bg-[#33478D]" style={{ width: `${progress.math}%` }} />
+                    <div className="bg-white rounded-[22px] overflow-hidden border border-[#E7EAF2] shadow-[0_4px_18px_rgba(24,39,75,0.04)] grid grid-cols-1 md:grid-cols-[230px_minmax(0,1fr)]">
+                      <div className={`${bgColor} min-h-[240px] flex flex-col items-center justify-center text-white`}>
+                        <div className="text-[18px] tracking-[0.25em] font-extrabold">LESSON</div>
+                        <div className="text-[11px] opacity-80 mt-2 uppercase tracking-[0.12em]">{subject}</div>
+                      </div>
+                      <div className="p-6 md:p-7">
+                        <div className="flex items-center gap-3 text-[12px] font-bold">
+                          <span className="px-3 py-1 rounded-md bg-[#EEF2FF] text-[#3C4E92] uppercase tracking-wide">{subject}</span>
+                        </div>
+                        <h3 className="mt-4 text-[24px] font-extrabold text-[#27314D] tracking-[-0.02em]">{title}</h3>
+                        <div className="mt-6">
+                          <div className="flex items-center justify-between text-[14px] font-bold text-[#3A4566] mb-2">
+                            <span>Progress</span><span>{prog}%</span>
+                          </div>
+                          <div className="h-[7px] rounded-full bg-[#E8EBF3] overflow-hidden">
+                            <div className="h-full rounded-full bg-[#33478D]" style={{ width: `${prog}%` }} />
+                          </div>
+                        </div>
+                        <div className="mt-7 flex flex-wrap gap-3">
+                          <button
+                            onClick={() => router.push(`/lessons/${slug}`)}
+                            className="inline-flex items-center gap-2 bg-[#33478D] text-white px-5 py-3 rounded-[12px] font-bold shadow-md hover:bg-[#2b3d7a] transition"
+                          >
+                            <Play size={16} fill="white" /> Resume Lesson
+                          </button>
+                          <button
+                            onClick={() => speak(`${title}.`)}
+                            className="inline-flex items-center gap-2 bg-[#EAF7EE] text-[#2E8B57] px-5 py-3 rounded-[12px] font-bold hover:bg-[#dff1e5] transition"
+                          >
+                            <Mic size={16} /> Read Lesson
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-7 flex flex-wrap gap-3">
-                    <button
-                      onClick={() => router.push("/lessons/intro-to-fractions")}
-                      className="inline-flex items-center gap-2 bg-[#33478D] text-white px-5 py-3 rounded-[12px] font-bold shadow-md hover:bg-[#2b3d7a] transition"
-                    >
-                      <Play size={16} fill="white" /> Resume Lesson
-                    </button>
-                    <button
-                      onClick={() => speak("Introduction to Fractions. Master the basics of numerators, denominators, and equivalent fractions through visual puzzles.")}
-                      className="inline-flex items-center gap-2 bg-[#EAF7EE] text-[#2E8B57] px-5 py-3 rounded-[12px] font-bold hover:bg-[#dff1e5] transition"
-                    >
-                      <Mic size={16} /> Read Lesson
-                    </button>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </section>
 
             {/* Progress Overview */}
             <section>
               <h2 className="text-[18px] font-extrabold text-[#27314D] mb-3">My Progress Overview</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <ProgressOverviewCard title="Math"    value={progress.math    ?? 80} icon={<Calculator  size={18} className="text-[#E7873C]" />} iconBg="bg-[#FFF1E4]" barColor="#E7873C" />
-                <ProgressOverviewCard title="Science" value={progress.science ?? 45} icon={<FlaskConical size={18} className="text-[#5AAF7B]" />} iconBg="bg-[#E9F7EF]" barColor="#5AAF7B" />
-                <ProgressOverviewCard title="English" value={progress.english ?? 90} icon={<BookOpen    size={18} className="text-[#A15EFF]" />} iconBg="bg-[#F4ECFF]" barColor="#A15EFF" />
+                <ProgressOverviewCard title="Math"    value={progress.math    ?? 0} icon={<Calculator  size={18} className="text-[#E7873C]" />} iconBg="bg-[#FFF1E4]" barColor="#E7873C" />
+                <ProgressOverviewCard title="Science" value={progress.science ?? 0} icon={<FlaskConical size={18} className="text-[#5AAF7B]" />} iconBg="bg-[#E9F7EF]" barColor="#5AAF7B" />
+                <ProgressOverviewCard title="English" value={progress.english ?? 0} icon={<BookOpen    size={18} className="text-[#A15EFF]" />} iconBg="bg-[#F4ECFF]" barColor="#A15EFF" />
               </div>
             </section>
 
@@ -287,10 +331,15 @@ export default function Dashboard() {
               <h2 className="text-[18px] font-extrabold text-[#27314D] mb-3">Weekly Study Plan</h2>
               <div className="bg-white rounded-[22px] border border-[#E7EAF2] shadow-[0_4px_18px_rgba(24,39,75,0.04)] px-5 py-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-                  <MiniPlan label="Mon: Algebra"    value={90} color="#E7873C" />
-                  <MiniPlan label="Tue: Biology"    value={40} color="#5AAF7B" />
-                  <MiniPlan label="Wed: Literature" value={20} color="#A15EFF" />
-                  <MiniPlan label="Thu: Physics"    value={0}  color="#D3D9E8" />
+                  {weeklyPlan.length > 0
+                    ? weeklyPlan.map(p => <MiniPlan key={p.day} label={p.label} value={p.value} color={p.color} />)
+                    : <>
+                        <MiniPlan label="Mon: Mathematics" value={progress.math    ?? 0} color="#E7873C" />
+                        <MiniPlan label="Tue: Science"     value={progress.science ?? 0} color="#5AAF7B" />
+                        <MiniPlan label="Wed: English"     value={progress.english ?? 0} color="#A15EFF" />
+                        <MiniPlan label="Thu: Mathematics" value={progress.math    ?? 0} color="#D3D9E8" />
+                      </>
+                  }
                 </div>
               </div>
             </section>
@@ -395,16 +444,23 @@ function TopGoalCard() {
 }
 
 function ProgressOverviewCard({ title, value, icon, iconBg, barColor }: { title: string; value: number; icon: React.ReactNode; iconBg: string; barColor: string }) {
+  const hasData = value > 0;
   return (
     <div className="bg-white rounded-[18px] border border-[#E7EAF2] shadow-[0_4px_18px_rgba(24,39,75,0.04)] p-5">
       <div className="flex items-center justify-between">
         <div className={`w-9 h-9 rounded-[10px] ${iconBg} flex items-center justify-center`}>{icon}</div>
-        <span className="text-[17px] font-extrabold text-[#27314D]">{value}%</span>
+        <span className={`text-[17px] font-extrabold ${hasData ? "text-[#27314D]" : "text-[#C0C8D6]"}`}>
+          {hasData ? `${value}%` : "–"}
+        </span>
       </div>
       <p className="mt-5 text-[15px] font-extrabold text-[#3A4566]">{title}</p>
-      <div className="mt-4 h-[6px] bg-[#E8EBF3] rounded-full overflow-hidden">
-        <div className="h-full rounded-full" style={{ width: `${value}%`, backgroundColor: barColor }} />
-      </div>
+      {hasData ? (
+        <div className="mt-4 h-[6px] bg-[#E8EBF3] rounded-full overflow-hidden">
+          <div className="h-full rounded-full" style={{ width: `${value}%`, backgroundColor: barColor }} />
+        </div>
+      ) : (
+        <p className="mt-3 text-[12px] text-[#B0BACC] font-medium">Complete a quiz to track progress</p>
+      )}
     </div>
   );
 }
