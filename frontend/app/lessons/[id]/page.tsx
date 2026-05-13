@@ -25,24 +25,26 @@ type Lesson = {
 };
 
 export default function LessonReaderPage() {
-  const router   = useRouter();
-  const params   = useParams();
+  const router = useRouter();
+  const params = useParams();
   const lessonId = params?.id as string;
 
-  const [user, setUser]         = useState<any>(null);
-  const [lesson, setLesson]     = useState<Lesson | null>(null);
-  const [loading, setLoading]   = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isListening, setIsListening] = useState(false);
-  const [isPlaying, setIsPlaying]     = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
 
-  const hasStartedRef   = useRef(false);
+  const [displayMode, setDisplayMode] = useState<"normal" | "dyslexic" | "high-contrast">("normal");
+
+  const hasStartedRef = useRef(false);
   const currentBlockRef = useRef(0);
-  const lastSpokenRef   = useRef("");
-  const readableRef     = useRef<{ content: string }[]>([]);
-  // "READING" only — mode selection removed (student is voice-only)
-  const voiceStepRef    = useRef<"READING">("READING");
-  const recognitionRef  = useRef<any>(null);
+  const lastSpokenRef = useRef("");
+  const readableRef = useRef<{ content: string }[]>([]);
+  const voiceStepRef = useRef<"MODE_SELECT" | "READING">("MODE_SELECT");
+  const modeTimeoutRef = useRef<any>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     const s = localStorage.getItem("user");
@@ -79,12 +81,12 @@ export default function LessonReaderPage() {
     recognitionRef.current = recognition;
 
     let keepListening = true;
-    let isSpeaking    = false;
+    let isSpeaking = false;
 
-    const stopListening  = () => { try { recognition.stop(); } catch {} };
+    const stopListening = () => { try { recognition.stop(); } catch { } };
     const startListening = () => {
       if (!keepListening || isSpeaking) return;
-      try { recognition.start(); } catch {}
+      try { recognition.start(); } catch { }
     };
 
     const speakThen = (text: string, onEnd?: () => void, resumeAfter = true) => {
@@ -101,6 +103,7 @@ export default function LessonReaderPage() {
     };
 
     const readFromBlock = (idx: number) => {
+      if (!keepListening) return; // Don't auto-advance while paused
       const blocks = readableRef.current;
       if (idx >= blocks.length) {
         speakThen(
@@ -131,21 +134,30 @@ export default function LessonReaderPage() {
       );
     };
 
-    // ── Greeting — straight to reading, no mode selection ─────────────────
+    // ── Greeting — ask mode then start reading ────────────────────────────
     const startAssistant = async () => {
       if (hasStartedRef.current) return;
       hasStartedRef.current = true;
       await tryUnlockAudio();
+      voiceStepRef.current = "MODE_SELECT";
       speakThen(
-        `Welcome! You're now in the lesson "${lesson.title}". Starting in just a moment.`,
-        () => setTimeout(startReadingFlow, 600)
+        `Welcome to "${lesson.title}". Choose your display mode: say dyslexic, high contrast, or normal.`,
+        () => {
+          // Auto-proceed with normal after 8 seconds if no response
+          modeTimeoutRef.current = setTimeout(() => {
+            if (voiceStepRef.current === "MODE_SELECT") {
+              voiceStepRef.current = "READING";
+              startReadingFlow();
+            }
+          }, 8000);
+        }
       );
     };
 
-    recognition.continuous    = true;
+    recognition.continuous = true;
     recognition.interimResults = false;
-    recognition.lang          = "en-US";
-    recognition.maxAlternatives = 3;
+    recognition.lang = "en-US";
+    recognition.maxAlternatives = 5;
 
     recognition.onstart = () => setIsListening(true);
 
@@ -170,13 +182,53 @@ export default function LessonReaderPage() {
     };
 
     recognition.onresult = (event: any) => {
-      // Check all alternatives for better command matching
-      let cmd = "";
-      for (let i = 0; i < event.results.length; i++) {
-        const r = event.results[event.results.length - 1 - i];
-        if (r && r[0]) { cmd = r[0].transcript.toLowerCase().trim(); break; }
+      // Merge all alternatives from the latest result for broader command matching
+      const lastResult = event.results[event.results.length - 1];
+      const cmd = Array.from({ length: lastResult.length }, (_: unknown, i: number) =>
+        lastResult[i].transcript.toLowerCase().trim()
+      ).join(" | ");
+      console.log(`[Lesson voice | step=${voiceStepRef.current}] heard:`, cmd);
+
+      // ── Mode selection (available at any step) ────────────────────────────
+      const isDyslexic    = cmd.includes("dyslexic") || cmd.includes("lexic") || cmd.includes("dys");
+      const isHighContrast = cmd.includes("high contrast") || cmd.includes("contrast") || cmd.includes("dark");
+      const isNormal      = (cmd.includes("normal") || cmd.includes("standard") || cmd.includes("regular") || cmd.includes("default")) && !cmd.includes("quiz");
+
+      if (voiceStepRef.current === "MODE_SELECT") {
+        if (modeTimeoutRef.current) { clearTimeout(modeTimeoutRef.current); modeTimeoutRef.current = null; }
+        if (isDyslexic) {
+          setDisplayMode("dyslexic");
+          speakThen("Dyslexic mode activated.", () => { voiceStepRef.current = "READING"; startReadingFlow(); });
+        } else if (isHighContrast) {
+          setDisplayMode("high-contrast");
+          speakThen("High contrast mode activated.", () => { voiceStepRef.current = "READING"; startReadingFlow(); });
+        } else if (isNormal) {
+          setDisplayMode("normal");
+          speakThen("Normal mode. Starting your lesson.", () => { voiceStepRef.current = "READING"; startReadingFlow(); });
+        } else {
+          setDisplayMode("normal");
+          voiceStepRef.current = "READING";
+          startReadingFlow();
+        }
+        return;
       }
-      console.log(`[Lesson voice] heard:`, cmd);
+
+      // ── Mode switching during READING (say mode name at any time) ─────────
+      if (isDyslexic && voiceStepRef.current === "READING") {
+        setDisplayMode("dyslexic");
+        speakThen("Dyslexic mode activated.");
+        return;
+      }
+      if (isHighContrast && voiceStepRef.current === "READING") {
+        setDisplayMode("high-contrast");
+        speakThen("High contrast mode activated.");
+        return;
+      }
+      if (isNormal && voiceStepRef.current === "READING") {
+        setDisplayMode("normal");
+        speakThen("Normal mode activated.");
+        return;
+      }
 
       if (cmd.includes("pause") || cmd.includes("stop")) {
         keepListening = false;
@@ -188,7 +240,10 @@ export default function LessonReaderPage() {
         return;
       }
       if (cmd.includes("resume") || cmd.includes("continue") || cmd.includes("play")) {
-        readFromBlock(currentBlockRef.current);
+        keepListening = true;
+        isSpeaking = false;
+        window.speechSynthesis.cancel();
+        setTimeout(() => readFromBlock(currentBlockRef.current), 200);
         return;
       }
       if (cmd.includes("repeat")) {
@@ -205,12 +260,12 @@ export default function LessonReaderPage() {
         readFromBlock(Math.max(currentBlockRef.current - 1, 0));
         return;
       }
-      if (cmd.includes("quiz") || cmd.includes("go to quiz")) {
+      if (cmd.includes("quiz")) {
         keepListening = false;
         stopListening();
-        speakThen("Opening the quiz now. Good luck!", () => {
-          router.push(lesson.quizRoute || `/quiz?lesson=${lesson.slug}`);
-        }, false);
+        window.speechSynthesis.cancel();
+        // Navigate immediately — no TTS delay
+        router.push(`/quiz?lesson=${lesson.slug}`);
         return;
       }
       if (cmd.includes("lesson") || cmd.includes("back")) {
@@ -236,21 +291,22 @@ export default function LessonReaderPage() {
     startAssistant();
 
     const unlock = async () => { await tryUnlockAudio(); startAssistant(); };
-    window.addEventListener("click",   unlock, { once: true });
+    window.addEventListener("click", unlock, { once: true });
     window.addEventListener("keydown", unlock, { once: true });
 
     return () => {
       keepListening = false;
+      if (modeTimeoutRef.current) { clearTimeout(modeTimeoutRef.current); modeTimeoutRef.current = null; }
       // Do NOT reset hasStartedRef — prevents double-greeting on Strict Mode re-mount
-      window.removeEventListener("click",   unlock);
+      window.removeEventListener("click", unlock);
       window.removeEventListener("keydown", unlock);
       try {
-        recognition.onstart  = null;
-        recognition.onend    = null;
+        recognition.onstart = null;
+        recognition.onend = null;
         recognition.onresult = null;
-        recognition.onerror  = null;
+        recognition.onerror = null;
         recognition.stop();
-      } catch {}
+      } catch { }
       window.speechSynthesis.cancel();
       setIsListening(false);
       setIsPlaying(false);
@@ -258,7 +314,7 @@ export default function LessonReaderPage() {
   }, [lesson, router]);
 
   // Manual playback controls
-  const pauseSpeech       = () => { window.speechSynthesis.cancel(); setIsPlaying(false); };
+  const pauseSpeech = () => { window.speechSynthesis.cancel(); setIsPlaying(false); };
   const speakCurrentBlock = () => {
     const b = readableBlocks[currentBlockIndex];
     if (b) { setIsPlaying(true); speak(b.content, () => setIsPlaying(false)); }
@@ -290,7 +346,7 @@ export default function LessonReaderPage() {
   const sideBarContent = (
     <div className="space-y-6">
       <button
-        onClick={() => router.push(lesson.quizRoute || `/quiz?lesson=${lesson.slug}`)}
+        onClick={() => router.push(`/quiz?lesson=${lesson.slug}`)}
         className="w-full bg-[#1E2B5A] text-white rounded-[24px] p-8 shadow-xl hover:bg-[#152042] transition-all group relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 p-4 opacity-10"><SquarePen size={80} /></div>
@@ -306,26 +362,67 @@ export default function LessonReaderPage() {
           <Mic size={20} className="text-[#33478D]" /> Voice Commands
         </div>
         <div className="space-y-5">
-          <CommandChip label="Next"       text="move to next section" />
-          <CommandChip label="Previous"   text="go back one section" />
-          <CommandChip label="Pause"      text="pause reading" />
-          <CommandChip label="Resume"     text="continue reading" />
-          <CommandChip label="Repeat"     text="hear section again" />
+          <CommandChip label="Next" text="move to next section" />
+          <CommandChip label="Previous" text="go back one section" />
+          <CommandChip label="Pause" text="pause reading" />
+          <CommandChip label="Resume" text="continue reading" />
+          <CommandChip label="Repeat" text="hear section again" />
           <CommandChip label="Go to Quiz" text="start the quiz" />
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-[#D1D9E6]">
+          <div className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-4">Display Mode</div>
+          <div className="space-y-3">
+            <CommandChip label="Normal" text="standard display" />
+            <CommandChip label="Dyslexic" text="dyslexia-friendly font" />
+            <CommandChip label="High Contrast" text="dark high-contrast theme" />
+          </div>
+          <div className="flex gap-2 mt-4">
+            {(["normal", "dyslexic", "high-contrast"] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setDisplayMode(m)}
+                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition ${
+                  displayMode === m
+                    ? "bg-[#1E2B5A] text-white"
+                    : "bg-white border border-[#D1D9E6] text-[#5E6D8F] hover:border-[#1E2B5A]"
+                }`}
+              >
+                {m === "normal" ? "Normal" : m === "dyslexic" ? "Dyslexic" : "Hi-C"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 
+  const modeCSS = `
+    .dys-mode .lesson-content { background-color: #FFFDE7 !important; }
+    .dys-mode .lesson-content p, .dys-mode .lesson-content h1,
+    .dys-mode .lesson-content h2, .dys-mode .lesson-content h3 {
+      font-family: 'Comic Sans MS', 'Comic Sans', cursive, sans-serif !important;
+      letter-spacing: 0.07em !important; word-spacing: 0.25em !important; line-height: 2.2 !important;
+    }
+    .hc-mode { background-color: #111111 !important; }
+    .hc-mode .lesson-content { background-color: #1A1A1A !important; border-color: #555 !important; }
+    .hc-mode .lesson-content * { color: #FFFFFF !important; }
+    .hc-mode .lesson-content [class*="bg-"] { background-color: #2A2A2A !important; }
+    .hc-mode .lesson-footer { background-color: #111111 !important; border-color: #444 !important; }
+    .hc-mode .lesson-footer * { color: #FFFFFF !important; }
+    .hc-mode .lesson-footer [class*="bg-"] { background-color: #1A1A1A !important; }
+  `;
+
   return (
-    <div className="bg-[#F4F6FA] min-h-screen">
+    <div className={`min-h-screen bg-[#F4F6FA] ${displayMode === "dyslexic" ? "dys-mode" : displayMode === "high-contrast" ? "hc-mode" : ""}`}>
+      <style>{modeCSS}</style>
       <DashboardNavbar user={user} />
 
       <div className="max-w-[1440px] mx-auto px-10 pt-10 pb-32">
         <div className="grid gap-12 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px]">
 
           {/* Lesson Content */}
-          <div className="bg-white border border-[#E9EDF5] rounded-[32px] overflow-hidden shadow-sm flex flex-col">
+          <div className="lesson-content bg-white border border-[#E9EDF5] rounded-[32px] overflow-hidden shadow-sm flex flex-col">
             {lesson.image && (
               <div className="relative h-52 overflow-hidden">
                 <img
@@ -424,7 +521,7 @@ export default function LessonReaderPage() {
       </div>
 
       {/* Footer player */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E9EDF5] h-[110px] flex items-center px-12 shadow-[0_-10px_40px_rgba(0,0,0,0.02)] z-50">
+      <footer className="lesson-footer fixed bottom-0 left-0 right-0 bg-white border-t border-[#E9EDF5] h-[110px] flex items-center px-12 shadow-[0_-10px_40px_rgba(0,0,0,0.02)] z-50">
         <div className="max-w-[1440px] mx-auto w-full flex items-center justify-between">
           <div className="flex items-center gap-8">
             <button onClick={prevBlock} className="text-[#8793AC] hover:text-[#1E2B5A]"><SkipBack size={24} /></button>
@@ -450,11 +547,15 @@ export default function LessonReaderPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-3 bg-[#F8FAFF] border border-[#E9EDF5] px-6 py-4 rounded-2xl cursor-pointer hover:border-[#1E2B5A] transition">
-              <Settings size={18} className="text-[#33478D]" />
-              <span className="text-[14px] font-black text-[#1E2B5A] whitespace-nowrap">1.0× Speed</span>
-            </div>
+          <div className="flex items-center gap-4">
+            {displayMode !== "normal" && (
+              <div className="flex items-center gap-2 bg-[#EEF2FF] border border-[#C7D2FE] px-4 py-3 rounded-2xl">
+                <Settings size={14} className="text-[#4F46E5]" />
+                <span className="text-[12px] font-black text-[#4F46E5] whitespace-nowrap uppercase tracking-wider">
+                  {displayMode === "dyslexic" ? "Dyslexic" : "Hi-Contrast"}
+                </span>
+              </div>
+            )}
             <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl ${isListening ? "bg-[#1E2B5A] text-white" : "bg-[#F8FAFF] border border-[#E9EDF5] text-[#1E2B5A]"}`}>
               <Mic size={18} className={isListening ? "animate-pulse" : ""} />
               <span className="text-[14px] font-black whitespace-nowrap">
@@ -462,7 +563,7 @@ export default function LessonReaderPage() {
               </span>
             </div>
             <button
-              onClick={() => router.push(lesson.quizRoute || `/quiz?lesson=${lesson.slug}`)}
+              onClick={() => router.push(`/quiz?lesson=${lesson.slug}`)}
               className="bg-[#9BB3DD] text-[#1E2B5A] font-black uppercase text-[12px] tracking-widest px-10 py-[18px] rounded-2xl flex items-center gap-3 hover:bg-[#8AA7D7] transition shadow-md"
             >
               <MonitorPlay size={20} /> Take Quiz
