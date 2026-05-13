@@ -12,6 +12,7 @@ app.use(cors({
 
 app.use(express.json());
 
+
 /* ---------------- ENV CHECK ---------------- */
 if (!process.env.MONGO_URI) {
   console.error("MONGO_URI is missing in backend/.env");
