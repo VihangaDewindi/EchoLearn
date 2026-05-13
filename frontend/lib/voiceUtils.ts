@@ -31,7 +31,7 @@ export const speak = (text: string, onEnd?: () => void) => {
   synth.cancel();
 
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.88;   // Slightly slower — warm, clear
+  utterance.rate = 1.08;   // Natural conversational pace
   utterance.pitch = 1.05;  // Slightly warmer pitch
   utterance.volume = 1;
   utterance.lang = "en-US";
