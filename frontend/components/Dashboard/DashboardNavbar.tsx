@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Search } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { Search, LogOut } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
 
 export default function DashboardNavbar({ user }: { user: any }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const links = [
     { label: "Home",         href: "/Student/dashboard" },
@@ -14,6 +18,22 @@ export default function DashboardNavbar({ user }: { user: any }) {
     { label: "Achievements", href: "/achievements" },
     { label: "Quiz",         href: "/quiz" },
   ];
+
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    router.push("/login");
+  };
 
   return (
     <div className="w-full bg-white flex justify-center sticky top-0 z-50 border-b">
@@ -31,7 +51,7 @@ export default function DashboardNavbar({ user }: { user: any }) {
           ))}
         </div>
 
-        {/* RIGHT: Search + Settings + Avatar */}
+        {/* RIGHT: Search + Avatar with logout */}
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full w-64">
             <Search size={16} className="text-gray-700" />
@@ -41,8 +61,30 @@ export default function DashboardNavbar({ user }: { user: any }) {
               className="bg-gray-100 text-sm w-full focus:outline-none"
             />
           </div>
-          <div className="w-8 h-8 rounded-full bg-[#1F3F7F] flex items-center justify-center text-white text-sm font-bold">
-            {user?.fullName?.charAt(0)?.toUpperCase() || "U"}
+
+          {/* Avatar dropdown */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              className="w-8 h-8 rounded-full bg-[#1F3F7F] flex items-center justify-center text-white text-sm font-bold cursor-pointer hover:opacity-90 transition"
+            >
+              {user?.fullName?.charAt(0)?.toUpperCase() || "U"}
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
+                <div className="px-4 py-2 border-b border-gray-100">
+                  <p className="text-xs font-bold text-gray-900 truncate">{user?.fullName || "Student"}</p>
+                  <p className="text-[11px] text-gray-400 truncate">{user?.email || ""}</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 transition"
+                >
+                  <LogOut size={15} /> Log Out
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
