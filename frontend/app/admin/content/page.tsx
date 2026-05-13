@@ -39,9 +39,9 @@ export default function AdminContent() {
   const filtered = subjectFilter === "all" ? lessons : lessons.filter(l => l.subject === subjectFilter);
 
   const subjectColor: Record<string, string> = {
-    math:     "bg-blue-100 text-blue-700",
-    science:  "bg-emerald-100 text-emerald-700",
-    english:  "bg-purple-100 text-purple-700",
+    mathematics: "bg-blue-100 text-blue-700",
+    science:     "bg-emerald-100 text-emerald-700",
+    english:     "bg-purple-100 text-purple-700",
   };
 
   return (
