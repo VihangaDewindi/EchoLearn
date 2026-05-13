@@ -42,6 +42,10 @@ function ResultsContent() {
     if (!recognition) return;
     recognitionRef.current = recognition;
 
+    // Reset on every effect run so Strict Mode re-mount doesn't leave listening dead
+    keepListeningRef.current = true;
+    isSpeakingRef.current    = false;
+
     recognition.continuous     = true;
     recognition.interimResults = false;
     recognition.lang           = "en-US";
@@ -55,11 +59,11 @@ function ResultsContent() {
 
     const speakThen = (text: string, onEnd?: () => void) => {
       isSpeakingRef.current = true;
-      stopListening();
+      // Keep recognition running during TTS so commands are heard immediately after
       speak(text, () => {
         isSpeakingRef.current = false;
         onEnd?.();
-        if (keepListeningRef.current) setTimeout(startListening, 400);
+        if (keepListeningRef.current) setTimeout(startListening, 200);
       });
     };
 
@@ -129,7 +133,13 @@ function ResultsContent() {
       speakThen(announcement);
     };
 
-    startAssistant();
+    // Start recognition immediately so it's warm when the student speaks
+    setTimeout(startListening, 300);
+    if (!hasStartedRef.current) {
+      startAssistant();
+    } else {
+      // Strict Mode second mount: TTS already ran, recognition already started above
+    }
 
     const unlock = async () => { await tryUnlockAudio(); startAssistant(); };
     window.addEventListener("click",   unlock, { once: true });
@@ -137,7 +147,7 @@ function ResultsContent() {
 
     return () => {
       keepListeningRef.current = false;
-      hasStartedRef.current    = false;
+      // Do NOT reset hasStartedRef — prevents double TTS in Strict Mode re-mount
       window.removeEventListener("click",   unlock);
       window.removeEventListener("keydown", unlock);
       try {
@@ -153,14 +163,14 @@ function ResultsContent() {
 
   return (
     <div className="min-h-screen bg-[#F5F8FA] flex flex-col font-sans">
-      <header className="bg-white border-b border-[#EAEAEF] px-8 py-4 flex items-center justify-between z-10 relative shadow-[0_4px_20px_rgba(30,41,59,0.02)]">
-        <div className="flex items-center gap-3">
+      <header className="bg-white border-b border-[#EAEAEF] sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-6 h-[72px] flex items-center justify-between">
           <Image src="/logo.png" alt="EchoLearn Logo" width={140} height={36} priority />
-        </div>
-        <div className="flex items-center gap-4 text-[#8C9BB3]">
-          <button className="hover:text-[#4A5E95] transition"><Settings size={22} className="stroke-[2.5px]" /></button>
-          <div className="w-10 h-10 rounded-full bg-[#1F3F7F] text-white flex items-center justify-center font-bold cursor-pointer">
-            {user?.fullName?.charAt(0)?.toUpperCase() || "U"}
+          <div className="flex items-center gap-4 text-[#8C9BB3]">
+            <button className="hover:text-[#4A5E95] transition"><Settings size={22} className="stroke-[2.5px]" /></button>
+            <div className="w-9 h-9 rounded-full bg-[#1F3F7F] text-white flex items-center justify-center font-bold text-sm cursor-pointer">
+              {user?.fullName?.charAt(0)?.toUpperCase() || "U"}
+            </div>
           </div>
         </div>
       </header>
@@ -174,7 +184,10 @@ function ResultsContent() {
 
           <h1 className="text-[44px] font-black text-[#1E273F] mb-2 tracking-tight">Quiz Complete!</h1>
           <p className="text-[18px] text-[#616D8A] font-medium mb-10">
-            {pct >= 80 ? "Excellent work! You're flying through this." : pct >= 60 ? "Good job! Keep up the momentum." : "Keep practising — you'll get there!"}
+            You earned{" "}
+            <span className="font-black text-[#C49500]">+{xp} XP</span>{" "}
+            for completing <span className="font-semibold text-[#1E273F]">{lessonTitle}</span>!{" "}
+            {pct >= 80 ? "Excellent work!" : pct >= 60 ? "Good job!" : "Keep practising!"}
           </p>
 
           <div className="w-full bg-white rounded-[24px] shadow-[0_8px_30px_rgba(30,41,59,0.06)] border border-[#EBEFF5] overflow-hidden">
