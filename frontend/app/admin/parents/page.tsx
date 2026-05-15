@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminNavbar from "@/components/Admin/AdminNavbar";
 import { Search, Star, ChevronDown, ChevronUp, UserCheck, Plus, Edit3, Trash2, X, Save, Eye } from "lucide-react";
@@ -12,6 +12,7 @@ export default function AdminParents() {
   const router = useRouter();
   const [admin, setAdmin]     = useState<any>(null);
   const [parents, setParents] = useState<any[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState("");
   const [token, setToken]     = useState("");
@@ -51,6 +52,11 @@ export default function AdminParents() {
     setAdmin(u);
     setToken(tok);
     fetchParents(tok, "");
+    // fetch all students for child-link suggestions
+    fetch(`${API}/api/admin/students`, { headers: { Authorization: `Bearer ${tok}` } })
+      .then(r => r.json())
+      .then(d => setAllStudents(Array.isArray(d) ? d : []))
+      .catch(() => {});
   }, [router]);
 
   useEffect(() => { if (token) fetchParents(token, search); }, [search]);
@@ -225,7 +231,7 @@ export default function AdminParents() {
               <h2 className="text-[22px] font-black text-[#1E2B5A]">Add Parent</h2>
               <button onClick={() => setAddOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl"><X size={20} className="text-[#8793AC]" /></button>
             </div>
-            <ParentForm form={addForm} setForm={setAddForm} showPassword />
+            <ParentForm form={addForm} setForm={setAddForm} showPassword students={allStudents} />
             <div className="flex gap-3 mt-8">
               <button onClick={() => setAddOpen(false)} className="flex-1 py-3 rounded-xl border border-[#E9EDF5] text-[14px] font-black text-[#8793AC] hover:bg-gray-50">Cancel</button>
               <button onClick={handleAdd} disabled={addSaving || !addForm.fullName.trim() || !addForm.email.trim() || !addForm.password.trim()}
@@ -245,7 +251,7 @@ export default function AdminParents() {
               <h2 className="text-[22px] font-black text-[#1E2B5A]">Edit Parent</h2>
               <button onClick={() => setEditParent(null)} className="p-2 hover:bg-gray-100 rounded-xl"><X size={20} className="text-[#8793AC]" /></button>
             </div>
-            <ParentForm form={editForm} setForm={setEditForm} showPassword />
+            <ParentForm form={editForm} setForm={setEditForm} showPassword students={allStudents} />
             <div className="flex gap-3 mt-8">
               <button onClick={() => setEditParent(null)} className="flex-1 py-3 rounded-xl border border-[#E9EDF5] text-[14px] font-black text-[#8793AC] hover:bg-gray-50">Cancel</button>
               <button onClick={handleEdit} disabled={editSaving}
@@ -336,7 +342,34 @@ export default function AdminParents() {
   );
 }
 
-function ParentForm({ form, setForm, showPassword }: { form: any; setForm: (f: any) => void; showPassword?: boolean }) {
+function ParentForm({
+  form, setForm, showPassword, students = [],
+}: {
+  form: any;
+  setForm: (f: any) => void;
+  showPassword?: boolean;
+  students?: any[];
+}) {
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setShowSuggestions(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const suggestions = form.childEmail.trim()
+    ? students
+        .filter(s =>
+          s.fullName.toLowerCase().includes(form.childEmail.toLowerCase()) ||
+          s.email.toLowerCase().includes(form.childEmail.toLowerCase())
+        )
+        .slice(0, 6)
+    : [];
+
   return (
     <div className="space-y-4">
       <div>
@@ -356,12 +389,50 @@ function ParentForm({ form, setForm, showPassword }: { form: any; setForm: (f: a
             className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A]" />
         </div>
       )}
-      <div>
-        <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Linked Child Email (optional)</label>
-        <input type="email" value={form.childEmail} onChange={e => setForm({ ...form, childEmail: e.target.value })}
-          placeholder="Student email to link"
-          className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A]" />
+
+      {/* Child autocomplete */}
+      <div ref={wrapRef} className="relative">
+        <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">
+          Link Child Student <span className="normal-case font-bold text-[#A0A9C0]">(optional)</span>
+        </label>
+        <input
+          type="text"
+          value={form.childEmail}
+          onChange={e => { setForm({ ...form, childEmail: e.target.value }); setShowSuggestions(true); }}
+          onFocus={() => setShowSuggestions(true)}
+          placeholder="Search by student name or email…"
+          className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A]"
+        />
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute top-full left-0 right-0 z-20 bg-white border border-[#E9EDF5] rounded-[14px] shadow-xl mt-1 max-h-52 overflow-y-auto">
+            {suggestions.map((s: any) => (
+              <button
+                key={s._id}
+                type="button"
+                onMouseDown={() => { setForm({ ...form, childEmail: s.email }); setShowSuggestions(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F4F7FF] text-left transition"
+              >
+                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-xs flex-shrink-0">
+                  {s.fullName?.charAt(0)?.toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-black text-[#1E2B5A] truncate">{s.fullName}</p>
+                  <p className="text-[11px] text-[#8793AC] truncate">{s.email}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-[11px] font-bold text-[#8793AC]">{(s.xp || 0)} XP · Lv {s.level || 1}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+        {form.childEmail && (
+          <p className="text-[11px] text-[#8793AC] font-bold mt-1">
+            Will link parent to student with email: <span className="text-[#1E2B5A]">{form.childEmail}</span>
+          </p>
+        )}
       </div>
+
       <div>
         <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Status</label>
         <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}

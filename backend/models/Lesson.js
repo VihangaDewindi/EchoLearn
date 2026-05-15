@@ -34,6 +34,7 @@ const lessonSchema = new mongoose.Schema(
     quizRoute: { type: String, default: "" },
     blocks: [lessonBlockSchema],
     quiz: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    teacherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true }
 );

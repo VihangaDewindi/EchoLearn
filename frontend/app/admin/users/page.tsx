@@ -216,7 +216,7 @@ export default function AdminUsers() {
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-[8px] text-[12px] font-black capitalize ${roleBadge[u.role] || "bg-gray-100 text-gray-700"}`}>{u.role}</span>
                     </td>
-                    <td className="px-6 py-4 font-bold text-[#1E2B5A]">{(u.xp || 0).toLocaleString()}</td>
+                    <td className="px-6 py-4 font-bold text-[#1E2B5A]">{u.role === "student" ? (u.xp || 0).toLocaleString() : "—"}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-[8px] text-[11px] font-black ${u.suspended ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}>
                         {u.suspended ? "Suspended" : "Active"}
@@ -301,13 +301,15 @@ export default function AdminUsers() {
             <div className="space-y-3">
               {[
                 { label: "Role",     value: viewUser.role },
-                { label: "XP",      value: (viewUser.xp || 0).toLocaleString() },
-                { label: "Level",   value: viewUser.level || 1 },
-                { label: "Streak",  value: `${viewUser.streak || 0} days` },
+                ...(viewUser.role === "student" ? [
+                  { label: "XP",     value: (viewUser.xp || 0).toLocaleString() },
+                  { label: "Level",  value: viewUser.level || 1 },
+                  { label: "Streak", value: `${viewUser.streak || 0} days` },
+                  { label: "Badges", value: (viewUser.badges?.length || 0) + " earned" },
+                ] : []),
                 { label: "Status",  value: viewUser.suspended ? "Suspended" : "Active" },
                 { label: "Joined",  value: viewUser.createdAt ? new Date(viewUser.createdAt).toLocaleDateString() : "—" },
                 { label: "Last Active", value: viewUser.lastActive ? new Date(viewUser.lastActive).toLocaleDateString() : "—" },
-                { label: "Badges",  value: (viewUser.badges?.length || 0) + " earned" },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between items-center py-2 border-b border-[#F4F6FA]">
                   <span className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider">{label}</span>
@@ -392,11 +394,13 @@ function UserForm({ form, setForm, showPassword }: { form: any; setForm: (f: any
           </select>
         </div>
       </div>
-      <div>
-        <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">XP Points</label>
-        <input type="number" value={form.xp} onChange={e => setForm({ ...form, xp: e.target.value })} min={0}
-          className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A]" />
-      </div>
+      {form.role === "student" && (
+        <div>
+          <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">XP Points</label>
+          <input type="number" value={form.xp} onChange={e => setForm({ ...form, xp: e.target.value })} min={0}
+            className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A]" />
+        </div>
+      )}
     </div>
   );
 }

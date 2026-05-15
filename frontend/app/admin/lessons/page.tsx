@@ -3,30 +3,34 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminNavbar from "@/components/Admin/AdminNavbar";
-import { Plus, Search, Edit3, Trash2, X, Save, ExternalLink, BookOpen } from "lucide-react";
+import { Plus, Search, Edit3, Trash2, X, Save, ExternalLink, BookOpen, UserCheck } from "lucide-react";
 
 const API      = "http://localhost:5001";
 const SUBJECTS = ["Mathematics", "Science", "English"];
 const GRADES   = Array.from({ length: 10 }, (_, i) => `${i + 1}`);
 const LEVELS   = ["Beginner", "Intermediate", "Advanced"];
 
+const BLANK_FORM = { title: "", subject: "Mathematics", grade: "1", duration: "12 min read", level: "Beginner", description: "", teacherId: "" };
+
 export default function AdminLessonsPage() {
   const router = useRouter();
   const [admin, setAdmin]     = useState<any>(null);
   const [lessons, setLessons] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState("");
   const [filterSubject, setFilterSubject] = useState("all");
+  const [token, setToken]     = useState("");
   const [toast, setToast]     = useState("");
 
   // Edit modal
   const [editLesson, setEditLesson]   = useState<any>(null);
-  const [editForm, setEditForm]       = useState({ title: "", subject: "Mathematics", grade: "1", duration: "12 min read", level: "Beginner", description: "" });
+  const [editForm, setEditForm]       = useState({ ...BLANK_FORM });
   const [editSaving, setEditSaving]   = useState(false);
 
   // Add modal
   const [addOpen, setAddOpen]     = useState(false);
-  const [addForm, setAddForm]     = useState({ title: "", subject: "Mathematics", grade: "1", duration: "12 min read", level: "Beginner", description: "" });
+  const [addForm, setAddForm]     = useState({ ...BLANK_FORM });
   const [addSaving, setAddSaving] = useState(false);
 
   // Delete confirm
@@ -35,11 +39,11 @@ export default function AdminLessonsPage() {
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
-  const fetchLessons = (token: string) => {
+  const fetchLessons = (tok: string) => {
     const params = new URLSearchParams();
     if (filterSubject !== "all") params.set("subject", filterSubject);
     if (search.trim()) params.set("search", search.trim());
-    fetch(`${API}/api/admin/lessons?${params}`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API}/api/admin/lessons?${params}`, { headers: { Authorization: `Bearer ${tok}` } })
       .then(r => r.json())
       .then(d => { setLessons(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
@@ -47,16 +51,21 @@ export default function AdminLessonsPage() {
 
   useEffect(() => {
     const raw = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
-    if (!raw || !token) { router.push("/login"); return; }
+    const tok = localStorage.getItem("token");
+    if (!raw || !tok) { router.push("/login"); return; }
     const u = JSON.parse(raw);
     if (u.role !== "admin") { router.push("/login"); return; }
     setAdmin(u);
-    fetchLessons(token);
+    setToken(tok);
+    fetchLessons(tok);
+    // fetch teachers for assignment dropdown
+    fetch(`${API}/api/admin/teachers`, { headers: { Authorization: `Bearer ${tok}` } })
+      .then(r => r.json())
+      .then(d => setTeachers(Array.isArray(d) ? d : []))
+      .catch(() => {});
   }, [router]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     if (token) fetchLessons(token);
   }, [filterSubject, search]);
 
@@ -69,13 +78,13 @@ export default function AdminLessonsPage() {
       duration:    l.duration    || "12 min read",
       level:       l.level       || "Beginner",
       description: l.description || "",
+      teacherId:   l.teacherId?._id || l.teacherId || "",
     });
   };
 
   const handleSave = async () => {
     if (!editLesson || !editForm.title.trim()) return;
     setEditSaving(true);
-    const token = localStorage.getItem("token");
     const res = await fetch(`${API}/api/admin/lessons/${editLesson._id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -93,7 +102,6 @@ export default function AdminLessonsPage() {
   const handleAdd = async () => {
     if (!addForm.title.trim()) return;
     setAddSaving(true);
-    const token = localStorage.getItem("token");
     const res = await fetch(`${API}/api/admin/lessons`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -103,7 +111,7 @@ export default function AdminLessonsPage() {
       const created = await res.json();
       setLessons(prev => [created, ...prev]);
       setAddOpen(false);
-      setAddForm({ title: "", subject: "Mathematics", grade: "1", duration: "12 min read", level: "Beginner", description: "" });
+      setAddForm({ ...BLANK_FORM });
       showToast("Lesson created!");
     } else { showToast("Failed to create lesson."); }
     setAddSaving(false);
@@ -112,7 +120,6 @@ export default function AdminLessonsPage() {
   const handleDelete = async () => {
     if (!deleteLesson) return;
     setDeleting(true);
-    const token = localStorage.getItem("token");
     const res = await fetch(`${API}/api/admin/lessons/${deleteLesson._id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
@@ -179,6 +186,7 @@ export default function AdminLessonsPage() {
                 <th className="text-left px-4 py-4 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Subject</th>
                 <th className="text-left px-4 py-4 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Grade</th>
                 <th className="text-left px-4 py-4 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Level</th>
+                <th className="text-left px-4 py-4 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Teacher</th>
                 <th className="text-left px-4 py-4 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Duration</th>
                 <th className="text-right px-6 py-4 text-[12px] font-black text-[#8793AC] uppercase tracking-wider">Actions</th>
               </tr>
@@ -187,13 +195,13 @@ export default function AdminLessonsPage() {
               {loading ? (
                 [...Array(6)].map((_, i) => (
                   <tr key={i} className="border-b border-[#F5F7FB]">
-                    {[...Array(6)].map((__, j) => (
+                    {[...Array(7)].map((__, j) => (
                       <td key={j} className="px-6 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td>
                     ))}
                   </tr>
                 ))
               ) : lessons.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-16 text-[#8793AC] font-bold">No lessons found.</td></tr>
+                <tr><td colSpan={7} className="text-center py-16 text-[#8793AC] font-bold">No lessons found.</td></tr>
               ) : lessons.map(lesson => (
                 <tr key={lesson._id} className="border-b border-[#F5F7FB] hover:bg-[#F8FAFD] transition-colors">
                   <td className="px-6 py-4">
@@ -211,6 +219,18 @@ export default function AdminLessonsPage() {
                     Grade {String(lesson.grade).replace(/^Grade\s+/i, "")}
                   </td>
                   <td className="px-4 py-4 text-[13px] font-bold text-[#5E6D8F]">{lesson.level || "Beginner"}</td>
+                  <td className="px-4 py-4">
+                    {lesson.teacherId ? (
+                      <div className="flex items-center gap-1.5">
+                        <UserCheck size={13} className="text-emerald-600 shrink-0" />
+                        <span className="text-[13px] font-bold text-[#1E2B5A] truncate max-w-[120px]">
+                          {lesson.teacherId.fullName || lesson.teacherId}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[12px] text-[#A0A9C0] font-bold">Unassigned</span>
+                    )}
+                  </td>
                   <td className="px-4 py-4 text-[13px] font-bold text-[#5E6D8F]">{lesson.duration || "—"}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
@@ -246,7 +266,7 @@ export default function AdminLessonsPage() {
               <h2 className="text-[22px] font-black text-[#1E2B5A]">Edit Lesson</h2>
               <button onClick={() => setEditLesson(null)} className="p-2 hover:bg-gray-100 rounded-xl"><X size={20} className="text-[#8793AC]" /></button>
             </div>
-            <LessonForm form={editForm} setForm={setEditForm} />
+            <LessonForm form={editForm} setForm={setEditForm} teachers={teachers} />
             <div className="flex gap-3 mt-8">
               <button onClick={() => setEditLesson(null)} className="flex-1 py-3 rounded-xl border border-[#E9EDF5] text-[14px] font-black text-[#8793AC] hover:bg-gray-50">Cancel</button>
               <button onClick={handleSave} disabled={editSaving || !editForm.title.trim()}
@@ -266,7 +286,7 @@ export default function AdminLessonsPage() {
               <h2 className="text-[22px] font-black text-[#1E2B5A]">Add New Lesson</h2>
               <button onClick={() => setAddOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl"><X size={20} className="text-[#8793AC]" /></button>
             </div>
-            <LessonForm form={addForm} setForm={setAddForm} />
+            <LessonForm form={addForm} setForm={setAddForm} teachers={teachers} />
             <div className="flex gap-3 mt-8">
               <button onClick={() => setAddOpen(false)} className="flex-1 py-3 rounded-xl border border-[#E9EDF5] text-[14px] font-black text-[#8793AC] hover:bg-gray-50">Cancel</button>
               <button onClick={handleAdd} disabled={addSaving || !addForm.title.trim()}
@@ -303,10 +323,7 @@ export default function AdminLessonsPage() {
   );
 }
 
-function LessonForm({ form, setForm }: { form: any; setForm: (f: any) => void }) {
-  const SUBJECTS = ["Mathematics", "Science", "English"];
-  const GRADES   = Array.from({ length: 10 }, (_, i) => `${i + 1}`);
-  const LEVELS   = ["Beginner", "Intermediate", "Advanced"];
+function LessonForm({ form, setForm, teachers = [] }: { form: any; setForm: (f: any) => void; teachers?: any[] }) {
   return (
     <div className="space-y-4">
       <div>
@@ -344,6 +361,16 @@ function LessonForm({ form, setForm }: { form: any; setForm: (f: any) => void })
             {LEVELS.map(l => <option key={l}>{l}</option>)}
           </select>
         </div>
+      </div>
+      <div>
+        <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Assigned Teacher</label>
+        <select value={form.teacherId} onChange={e => setForm({ ...form, teacherId: e.target.value })}
+          className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[14px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A] bg-white">
+          <option value="">— Unassigned —</option>
+          {teachers.map(t => (
+            <option key={t._id} value={t._id}>{t.fullName} ({t.email})</option>
+          ))}
+        </select>
       </div>
       <div>
         <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Description</label>

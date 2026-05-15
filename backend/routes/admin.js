@@ -384,7 +384,8 @@ router.get("/lessons", ...adminOnly, async (req, res) => {
       { slug:  { $regex: search, $options: "i" } },
     ];
     const lessons = await Lesson.find(filter)
-      .select("title subject grade slug duration level description image createdAt")
+      .select("title subject grade slug duration level description image teacherId createdAt")
+      .populate("teacherId", "fullName email")
       .sort({ subject: 1, grade: 1, title: 1 });
     res.json(lessons);
   } catch (err) {
@@ -394,7 +395,7 @@ router.get("/lessons", ...adminOnly, async (req, res) => {
 
 router.post("/lessons", ...adminOnly, async (req, res) => {
   try {
-    const { title, subject, grade, description, duration, level } = req.body;
+    const { title, subject, grade, description, duration, level, teacherId } = req.body;
     if (!title || !subject || !grade) return res.status(400).json({ error: "Title, subject, grade required" });
     const gradeNum = String(grade).replace(/^Grade\s+/i, "").trim();
     const slug = `${subject.toLowerCase().replace(/\s+/g, "-")}-grade-${gradeNum}-${title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}-${Date.now()}`;
@@ -407,6 +408,7 @@ router.post("/lessons", ...adminOnly, async (req, res) => {
       level:       level       || "Beginner",
       image:       SUBJECT_IMAGES[subject] || "",
       blocks:      [],
+      teacherId:   teacherId   || null,
     });
     res.status(201).json(lesson);
   } catch (err) {
@@ -416,7 +418,7 @@ router.post("/lessons", ...adminOnly, async (req, res) => {
 
 router.put("/lessons/:id", ...adminOnly, async (req, res) => {
   try {
-    const { title, subject, grade, unit, duration, level, description } = req.body;
+    const { title, subject, grade, unit, duration, level, description, teacherId } = req.body;
     const gradeNum = grade ? String(grade).replace(/^Grade\s+/i, "").trim() : undefined;
     const lesson = await Lesson.findByIdAndUpdate(
       req.params.id,
@@ -428,9 +430,10 @@ router.put("/lessons/:id", ...adminOnly, async (req, res) => {
         level:       level       || "Beginner",
         description: description || "",
         image:       SUBJECT_IMAGES[subject] || "",
+        teacherId:   teacherId !== undefined ? (teacherId || null) : undefined,
       },
       { new: true }
-    );
+    ).populate("teacherId", "fullName email");
     if (!lesson) return res.status(404).json({ error: "Lesson not found" });
     res.json(lesson);
   } catch (err) {
