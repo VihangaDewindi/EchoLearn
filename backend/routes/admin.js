@@ -1,4 +1,5 @@
 const router  = require("express").Router();
+const bcrypt  = require("bcryptjs");
 const User    = require("../models/user");
 const Lesson  = require("../models/Lesson");
 const Class   = require("../models/Class");
@@ -54,13 +55,36 @@ router.get("/users", ...adminOnly, async (req, res) => {
   }
 });
 
+router.post("/users", ...adminOnly, async (req, res) => {
+  try {
+    const { fullName, email, password, role } = req.body;
+    if (!fullName || !email || !password || !role) return res.status(400).json({ error: "fullName, email, password, role required" });
+    if (!["student", "teacher", "parent", "admin"].includes(role)) return res.status(400).json({ error: "Invalid role" });
+    const exists = await User.findOne({ email });
+    if (exists) return res.status(409).json({ error: "Email already in use" });
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await User.create({ fullName, email, password: hashed, role });
+    res.status(201).json({ ...user.toObject(), password: undefined });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
 router.patch("/users/:id", ...adminOnly, async (req, res) => {
   try {
-    const { role } = req.body;
-    if (!["student", "teacher", "parent", "admin"].includes(role)) {
-      return res.status(400).json({ error: "Invalid role" });
+    const { role, fullName, email, xp, status, password } = req.body;
+    const update = {};
+    if (role) {
+      if (!["student", "teacher", "parent", "admin"].includes(role)) return res.status(400).json({ error: "Invalid role" });
+      update.role = role;
     }
-    const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true }).select("-password");
+    if (fullName) update.fullName = fullName;
+    if (email) update.email = email;
+    if (xp !== undefined) update.xp = Number(xp);
+    if (status === "suspended") update.suspended = true;
+    if (status === "active")    update.suspended = false;
+    if (password) update.password = await bcrypt.hash(password, 10);
+    const user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select("-password");
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json(user);
   } catch (err) {
@@ -94,6 +118,67 @@ router.get("/students", ...adminOnly, async (req, res) => {
     res.json(students);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch students" });
+  }
+});
+
+router.post("/students", ...adminOnly, async (req, res) => {
+  try {
+    const { fullName, email, password, grade, parentEmail } = req.body;
+    if (!fullName || !email || !password) return res.status(400).json({ error: "fullName, email, password required" });
+    const exists = await User.findOne({ email });
+    if (exists) return res.status(409).json({ error: "Email already in use" });
+    const hashed = await bcrypt.hash(password, 10);
+    const level  = Number(grade) || 1;
+    const student = await User.create({ fullName, email, password: hashed, role: "student", level });
+    if (parentEmail) {
+      const parent = await User.findOne({ email: parentEmail, role: "parent" });
+      if (parent) {
+        const ParentStudentLink = require("../models/ParentStudentLink");
+        await ParentStudentLink.findOneAndUpdate(
+          { parentId: parent._id }, { studentId: student._id }, { upsert: true }
+        );
+      }
+    }
+    res.status(201).json({ ...student.toObject(), password: undefined });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create student" });
+  }
+});
+
+router.patch("/students/:id", ...adminOnly, async (req, res) => {
+  try {
+    const { fullName, email, password, grade, xp, level, parentEmail } = req.body;
+    const update = {};
+    if (fullName) update.fullName = fullName;
+    if (email)    update.email    = email;
+    if (password) update.password = await bcrypt.hash(password, 10);
+    if (grade !== undefined)  update.level = Number(grade) || 1;
+    if (level !== undefined)  update.level = Number(level);
+    if (xp    !== undefined)  update.xp    = Number(xp);
+    const student = await User.findOneAndUpdate({ _id: req.params.id, role: "student" }, update, { new: true }).select("-password");
+    if (!student) return res.status(404).json({ error: "Student not found" });
+    if (parentEmail) {
+      const parent = await User.findOne({ email: parentEmail, role: "parent" });
+      if (parent) {
+        const ParentStudentLink = require("../models/ParentStudentLink");
+        await ParentStudentLink.findOneAndUpdate(
+          { parentId: parent._id }, { studentId: student._id }, { upsert: true }
+        );
+      }
+    }
+    res.json(student);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update student" });
+  }
+});
+
+router.delete("/students/:id", ...adminOnly, async (req, res) => {
+  try {
+    const student = await User.findOneAndDelete({ _id: req.params.id, role: "student" });
+    if (!student) return res.status(404).json({ error: "Student not found" });
+    res.json({ message: "Student deleted" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete student" });
   }
 });
 
@@ -133,6 +218,45 @@ router.get("/teachers", ...adminOnly, async (req, res) => {
   }
 });
 
+router.post("/teachers", ...adminOnly, async (req, res) => {
+  try {
+    const { fullName, email, password, status } = req.body;
+    if (!fullName || !email || !password) return res.status(400).json({ error: "fullName, email, password required" });
+    const exists = await User.findOne({ email });
+    if (exists) return res.status(409).json({ error: "Email already in use" });
+    const hashed = await bcrypt.hash(password, 10);
+    const teacher = await User.create({ fullName, email, password: hashed, role: "teacher" });
+    res.status(201).json({ ...teacher.toObject(), password: undefined });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create teacher" });
+  }
+});
+
+router.patch("/teachers/:id", ...adminOnly, async (req, res) => {
+  try {
+    const { fullName, email, password, status } = req.body;
+    const update = {};
+    if (fullName) update.fullName = fullName;
+    if (email)    update.email    = email;
+    if (password) update.password = await bcrypt.hash(password, 10);
+    const teacher = await User.findOneAndUpdate({ _id: req.params.id, role: "teacher" }, update, { new: true }).select("-password");
+    if (!teacher) return res.status(404).json({ error: "Teacher not found" });
+    res.json(teacher);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update teacher" });
+  }
+});
+
+router.delete("/teachers/:id", ...adminOnly, async (req, res) => {
+  try {
+    const teacher = await User.findOneAndDelete({ _id: req.params.id, role: "teacher" });
+    if (!teacher) return res.status(404).json({ error: "Teacher not found" });
+    res.json({ message: "Teacher deleted" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete teacher" });
+  }
+});
+
 /* ─── PARENTS ─────────────────────────────────────────────────── */
 router.get("/parents", ...adminOnly, async (req, res) => {
   try {
@@ -163,6 +287,63 @@ router.get("/parents", ...adminOnly, async (req, res) => {
     res.json(parents.map(p => ({ ...p.toObject(), children: linkMap[p._id.toString()] || [] })));
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch parents" });
+  }
+});
+
+router.post("/parents", ...adminOnly, async (req, res) => {
+  try {
+    const { fullName, email, password, childEmail } = req.body;
+    if (!fullName || !email || !password) return res.status(400).json({ error: "fullName, email, password required" });
+    const exists = await User.findOne({ email });
+    if (exists) return res.status(409).json({ error: "Email already in use" });
+    const hashed = await bcrypt.hash(password, 10);
+    const parent  = await User.create({ fullName, email, password: hashed, role: "parent" });
+    if (childEmail) {
+      const child = await User.findOne({ email: childEmail, role: "student" });
+      if (child) {
+        const ParentStudentLink = require("../models/ParentStudentLink");
+        await ParentStudentLink.findOneAndUpdate(
+          { parentId: parent._id }, { studentId: child._id }, { upsert: true }
+        );
+      }
+    }
+    res.status(201).json({ ...parent.toObject(), password: undefined });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create parent" });
+  }
+});
+
+router.patch("/parents/:id", ...adminOnly, async (req, res) => {
+  try {
+    const { fullName, email, password, childEmail } = req.body;
+    const update = {};
+    if (fullName) update.fullName = fullName;
+    if (email)    update.email    = email;
+    if (password) update.password = await bcrypt.hash(password, 10);
+    const parent = await User.findOneAndUpdate({ _id: req.params.id, role: "parent" }, update, { new: true }).select("-password");
+    if (!parent) return res.status(404).json({ error: "Parent not found" });
+    if (childEmail) {
+      const child = await User.findOne({ email: childEmail, role: "student" });
+      if (child) {
+        const ParentStudentLink = require("../models/ParentStudentLink");
+        await ParentStudentLink.findOneAndUpdate(
+          { parentId: parent._id }, { studentId: child._id }, { upsert: true }
+        );
+      }
+    }
+    res.json(parent);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update parent" });
+  }
+});
+
+router.delete("/parents/:id", ...adminOnly, async (req, res) => {
+  try {
+    const parent = await User.findOneAndDelete({ _id: req.params.id, role: "parent" });
+    if (!parent) return res.status(404).json({ error: "Parent not found" });
+    res.json({ message: "Parent deleted" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete parent" });
   }
 });
 

@@ -19,6 +19,15 @@ function timeAgo(date: string) {
   return `${days} days ago`;
 }
 
+function scoreLabel(avg: number): { label: string; bg: string; text: string } {
+  if (avg >= 90) return { label: "Excellent",            bg: "bg-[#ECFDF5]", text: "text-[#065F46]" };
+  if (avg >= 75) return { label: "Very Good",            bg: "bg-[#F0FDF4]", text: "text-[#166534]" };
+  if (avg >= 60) return { label: "Good Performance",     bg: "bg-[#EFF6FF]", text: "text-[#1E40AF]" };
+  if (avg >= 50) return { label: "Moderate Performance", bg: "bg-[#F0FDF4]", text: "text-[#15803D]" };
+  if (avg >= 40) return { label: "Below Average",        bg: "bg-[#FFF7ED]", text: "text-[#EA580C]" };
+  return           { label: "Needs Support",             bg: "bg-[#FFF1F1]", text: "text-[#DC2626]" };
+}
+
 function ProgressBar({ value, color = "bg-[#33478D]" }: { value: number; color?: string }) {
   return (
     <div className="w-full h-[6px] bg-[#F0F2F5] rounded-full overflow-hidden">
@@ -51,10 +60,11 @@ export default function StudentManagementPage() {
   useEffect(fetchStudents, []);
 
   const filtered = students.filter((s) => {
+    const avg = s.progress.avg;
     const matchesTab =
       activeTab === "All Students" ||
-      (activeTab === "Struggling" && s.status === "struggling") ||
-      (activeTab === "Excelling"  && s.status === "excelling");
+      (activeTab === "Struggling" && avg < 50) ||
+      (activeTab === "Excelling"  && avg >= 50);
     const q = search.toLowerCase();
     const matchesSearch =
       s.fullName.toLowerCase().includes(q) ||
@@ -91,13 +101,6 @@ export default function StudentManagementPage() {
 
   const statusColor = (status: string) =>
     status === "excelling" ? "bg-[#5AAF7B]" : status === "struggling" ? "bg-[#E85A4F]" : "bg-[#33478D]";
-
-  const badgeColor = (status: string) =>
-    status === "excelling"
-      ? "bg-[#F3FAF7] text-[#03543F]"
-      : status === "struggling"
-      ? "bg-[#FFF1F1] text-[#C81E1E]"
-      : "bg-[#F0F2FA] text-[#33478D]";
 
   return (
     <div className="min-h-screen bg-[#F8FAFD] flex flex-col font-sans">
@@ -136,8 +139,8 @@ export default function StudentManagementPage() {
                 {tab !== "All Students" && (
                   <span className="ml-2 text-[11px] bg-[#E5E9F0] px-2 py-0.5 rounded-full">
                     {tab === "Struggling"
-                      ? students.filter((s) => s.status === "struggling").length
-                      : students.filter((s) => s.status === "excelling").length}
+                      ? students.filter((s) => s.progress.avg < 50).length
+                      : students.filter((s) => s.progress.avg >= 50).length}
                   </span>
                 )}
               </button>
@@ -194,9 +197,14 @@ export default function StudentManagementPage() {
                   </td>
                   <td className="p-6">
                     <div className="flex justify-center">
-                      <span className={`px-4 py-1.5 rounded-full text-[13px] font-black capitalize ${badgeColor(student.status)}`}>
-                        {student.status}
-                      </span>
+                      {(() => {
+                        const sl = scoreLabel(student.progress.avg);
+                        return (
+                          <span className={`px-4 py-1.5 rounded-full text-[11px] font-black ${sl.bg} ${sl.text}`}>
+                            {sl.label}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td className="p-6 text-[14px] font-bold text-[#5E6D8F]">{timeAgo(student.lastActive)}</td>
@@ -323,16 +331,24 @@ export default function StudentManagementPage() {
 
               {/* Status badge */}
               <div className="flex items-center gap-3">
-                <span className={`px-4 py-2 rounded-full text-[13px] font-black capitalize ${badgeColor(detail.status)}`}>
-                  {detail.status}
-                </span>
-                <span className="text-[13px] font-bold text-[#8793AC]">
-                  {detail.status === "struggling"
-                    ? "Quiz average < 60% — consider a review session."
-                    : detail.status === "excelling"
-                    ? "Quiz average ≥ 80% — performing well!"
-                    : "On track — quiz average 60–79%."}
-                </span>
+                {(() => {
+                  const sl = scoreLabel(detail.progress.avg);
+                  const tip =
+                    detail.progress.avg >= 90 ? "Outstanding performance — keep it up!" :
+                    detail.progress.avg >= 75 ? "Strong results across subjects." :
+                    detail.progress.avg >= 60 ? "Performing well — on track." :
+                    detail.progress.avg >= 50 ? "Moderate results — some improvement needed." :
+                    detail.progress.avg >= 40 ? "Below average — consider extra support." :
+                    "Needs support — quiz average below 40%.";
+                  return (
+                    <>
+                      <span className={`px-4 py-2 rounded-full text-[13px] font-black ${sl.bg} ${sl.text}`}>
+                        {sl.label}
+                      </span>
+                      <span className="text-[13px] font-bold text-[#8793AC]">{tip}</span>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 

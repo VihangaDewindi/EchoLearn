@@ -62,6 +62,7 @@ export default function CurriculumPage() {
   const [quizLoading, setQuizLoading] = useState(false);
   const [quizData, setQuizData]       = useState<any[]>([]);
   const [quizSource, setQuizSource]   = useState("");
+  const [quizSaving, setQuizSaving]   = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
@@ -198,9 +199,7 @@ export default function CurriculumPage() {
   };
 
   /* ── Generate Quiz ── */
-  const handleGenerateQuiz = async (lesson: any) => {
-    if (!lesson.slug) { showToast("Cannot generate quiz — no lesson slug."); return; }
-    setQuizLesson(lesson);
+  const generateQuizQuestions = async (lesson: any) => {
     setQuizData([]);
     setQuizSource("");
     setQuizLoading(true);
@@ -213,8 +212,34 @@ export default function CurriculumPage() {
       const data = await res.json();
       setQuizData(data.quiz || []);
       setQuizSource(data.source || "ai");
-    } catch { showToast("Failed to generate quiz."); setQuizLesson(null); }
+    } catch { showToast("Failed to generate quiz."); }
     finally { setQuizLoading(false); }
+  };
+
+  const handleGenerateQuiz = async (lesson: any) => {
+    if (!lesson.slug) { showToast("Cannot generate quiz — no lesson slug."); return; }
+    setQuizLesson(lesson);
+    await generateQuizQuestions(lesson);
+  };
+
+  /* ── Save Quiz to Lesson ── */
+  const handleSaveQuiz = async () => {
+    if (!quizLesson?.slug || quizData.length === 0) return;
+    setQuizSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API}/api/teacher/lessons/${quizLesson.slug}/save-quiz`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ quiz: quizData }),
+      });
+      if (res.ok) {
+        showToast(`Quiz saved to "${quizLesson.name}" successfully!`);
+      } else {
+        showToast("Failed to save quiz.");
+      }
+    } catch { showToast("Network error saving quiz."); }
+    finally { setQuizSaving(false); }
   };
 
   return (
@@ -664,10 +689,26 @@ export default function CurriculumPage() {
             </div>
 
             {!quizLoading && quizData.length > 0 && (
-              <div className="p-6 border-t border-[#E5E9F0] bg-[#F8FAFD] rounded-b-[28px]">
-                <p className="text-[12px] font-black text-[#8793AC] text-center">
-                  {quizData.length} questions generated · Students access this quiz via the lesson page
+              <div className="p-6 border-t border-[#E5E9F0] bg-[#F8FAFD] rounded-b-[28px] flex items-center justify-between gap-4">
+                <p className="text-[12px] font-black text-[#8793AC]">
+                  {quizData.length} questions · {quizSource === "ai" ? "AI Generated" : "Lesson-based"}
                 </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => quizLesson && generateQuizQuestions(quizLesson)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F5F7FB] text-[#33478D] text-[13px] font-black hover:bg-[#EAEFF7] transition-all"
+                  >
+                    <Zap size={14} strokeWidth={2.5} /> Regenerate
+                  </button>
+                  <button
+                    onClick={handleSaveQuiz}
+                    disabled={quizSaving}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#33478D] text-white text-[13px] font-black hover:bg-[#2A3B7A] transition-all disabled:opacity-50"
+                  >
+                    <Save size={14} strokeWidth={2.5} />
+                    {quizSaving ? "Saving…" : "Save to Lesson"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

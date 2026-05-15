@@ -19,6 +19,15 @@ function timeAgo(date: string) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function scoreLabel(avg: number): { label: string; bg: string; text: string } {
+  if (avg >= 90) return { label: "Excellent",            bg: "bg-[#ECFDF5]", text: "text-[#065F46]" };
+  if (avg >= 75) return { label: "Very Good",            bg: "bg-[#F0FDF4]", text: "text-[#166534]" };
+  if (avg >= 60) return { label: "Good Performance",     bg: "bg-[#EFF6FF]", text: "text-[#1E40AF]" };
+  if (avg >= 50) return { label: "Moderate Performance", bg: "bg-[#FEFCE8]", text: "text-[#92400E]" };
+  if (avg >= 40) return { label: "Below Average",        bg: "bg-[#FFF7ED]", text: "text-[#C2410C]" };
+  return           { label: "Needs Support",             bg: "bg-[#FFF1F1]", text: "text-[#C81E1E]" };
+}
+
 export default function TeacherClassesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("All Classes");
@@ -756,10 +765,14 @@ export default function TeacherClassesPage() {
                             </div>
                           ))}
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black capitalize ${
-                          s.status === "excelling" ? "bg-[#F3FAF7] text-[#03543F]" :
-                          s.status === "struggling" ? "bg-[#FFF1F1] text-[#C81E1E]" : "bg-[#F0F2FA] text-[#33478D]"
-                        }`}>{s.status}</span>
+                        {(() => {
+                          const sl = scoreLabel(s.progress ?? 0);
+                          return (
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black ${sl.bg} ${sl.text}`}>
+                              {sl.label}
+                            </span>
+                          );
+                        })()}
                         <button
                           onClick={() => handleRemoveStudent(s._id)}
                           disabled={removingId === s._id}

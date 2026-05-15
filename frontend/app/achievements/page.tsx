@@ -107,7 +107,7 @@ export default function AchievementsPage() {
 
     const stopListening  = () => { try { recognition.stop(); } catch {} };
     const startListening = () => {
-      if (!keepListeningRef.current || isSpeakingRef.current) return;
+      if (!keepListeningRef.current) return;
       try { recognition.start(); } catch {}
     };
     const speakThen = (text: string, onEnd?: () => void) => {
@@ -152,7 +152,7 @@ export default function AchievementsPage() {
           router.push("/lessons");
           return;
         }
-        if (cmd.includes("home") || cmd.includes("dashboard") || cmd.includes("back") || cmd.includes("main")) {
+        if (cmd.includes("home") || cmd.includes("dashboard") || cmd.includes("back") || cmd.includes("main") || cmd.includes("navigate home") || cmd.includes("go home") || cmd.includes("student dashboard")) {
           keepListeningRef.current = false;
           stopListening();
           window.speechSynthesis.cancel();

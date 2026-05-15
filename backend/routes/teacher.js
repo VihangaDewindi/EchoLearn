@@ -119,10 +119,13 @@ router.get("/dashboard", verifyToken, requireRole("teacher"), async (req, res) =
             acc + (s.progress.math + s.progress.science + s.progress.english) / 3, 0
           ) / uniqueStudents.length
         )
-      : 84;
+      : 0;
 
-    // Students needing support = those with low XP (< 100)
-    const studentsNeedingSupport = uniqueStudents.filter((s) => s.xp < 100).length;
+    // Students needing support = those with avg score < 40%
+    const studentsNeedingSupport = uniqueStudents.filter((s) => {
+      const avg = Math.round((s.progress.math + s.progress.science + s.progress.english) / 3);
+      return avg < 40;
+    }).length;
 
     // 7-day engagement: count unique students from teacher's classes who had LessonProgress activity each day
     const studentIds = uniqueStudents.map((s) => s._id);
@@ -665,10 +668,20 @@ router.get("/reports", verifyToken, requireRole("teacher"), async (req, res) => 
       ? (studentReports.reduce((a, s) => a + s.quizAvg, 0) / total).toFixed(1)
       : "0.0";
 
-    const atRisk = studentReports.filter((s) => s.quizAvg < 60).length;
-    const completionRate = studentReports.length > 0
-      ? Math.round(studentReports.filter(s => s.quizAvg >= 60).length / total * 100)
-      : 0;
+    // At-risk = students scoring below 40%
+    const atRisk = studentReports.filter((s) => s.quizAvg < 40).length;
+
+    // Completion rate = % of students who have at least one LessonProgress record
+    const studentIds = allStudents.map((s) => s._id);
+    let completionRate = 0;
+    if (studentIds.length > 0) {
+      const completedIds = await LessonProgress.distinct("userId", {
+        userId: { $in: studentIds },
+        progress: { $gt: 0 },
+      }).catch(() => []);
+      completionRate = Math.round(completedIds.length / total * 100);
+    }
+
     const engagementRate = studentReports.length > 0
       ? Math.round(studentReports.filter(s => s.quizAvg > 0).length / total * 100)
       : 0;
@@ -691,6 +704,26 @@ router.get("/reports", verifyToken, requireRole("teacher"), async (req, res) => 
     });
   } catch (err) {
     console.error("Teacher reports error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/* ─── SAVE QUIZ TO LESSON ─────────────────────────────────────── */
+router.post("/lessons/:slug/save-quiz", verifyToken, requireRole("teacher"), async (req, res) => {
+  try {
+    const { quiz } = req.body;
+    if (!Array.isArray(quiz) || quiz.length === 0) {
+      return res.status(400).json({ error: "Quiz array is required" });
+    }
+    const lesson = await Lesson.findOneAndUpdate(
+      { slug: req.params.slug },
+      { quiz },
+      { new: true }
+    );
+    if (!lesson) return res.status(404).json({ error: "Lesson not found" });
+    res.json({ message: "Quiz saved to lesson", lessonId: lesson._id });
+  } catch (err) {
+    console.error("Save quiz error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });

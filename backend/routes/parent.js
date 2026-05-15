@@ -9,17 +9,7 @@ async function getLinkedStudent(parentId) {
     "studentId",
     "fullName email progress xp level streak badges lastActive createdAt"
   );
-  if (link) return link.studentId;
-
-  // Demo fallback: link to first available student
-  const student = await User.findOne({ role: "student" }).select(
-    "fullName email progress xp level streak badges lastActive createdAt"
-  );
-  if (student) {
-    await ParentStudentLink.create({ parentId, studentId: student._id }).catch(() => {});
-    return student;
-  }
-  return null;
+  return link?.studentId || null;
 }
 
 /* ─── DASHBOARD ─────────────────────────────────────────────── */

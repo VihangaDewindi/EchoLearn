@@ -20,6 +20,15 @@ function timeAgo(date: string) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function scoreLabel(avg: number): { label: string; bg: string; text: string; dot: string } {
+  if (avg >= 90) return { label: "Excellent",             bg: "bg-[#ECFDF5]", text: "text-[#065F46]", dot: "bg-[#059669]" };
+  if (avg >= 75) return { label: "Very Good",             bg: "bg-[#F0FDF4]", text: "text-[#166534]", dot: "bg-[#16a34a]" };
+  if (avg >= 60) return { label: "Good Performance",      bg: "bg-[#EFF6FF]", text: "text-[#1E40AF]", dot: "bg-[#3B82F6]" };
+  if (avg >= 50) return { label: "Moderate Performance",  bg: "bg-[#F0FDF4]", text: "text-[#15803D]", dot: "bg-[#22c55e]" };
+  if (avg >= 40) return { label: "Below Average",         bg: "bg-[#FFF7ED]", text: "text-[#EA580C]", dot: "bg-[#EA580C]" };
+  return           { label: "Needs Support",              bg: "bg-[#FFF1F1]", text: "text-[#DC2626]", dot: "bg-[#EF4444]" };
+}
+
 export default function TeacherDashboard() {
   const router = useRouter();
   const [user, setUser]       = React.useState<any>(null);
@@ -125,7 +134,7 @@ export default function TeacherDashboard() {
             </div>
             <div>
               <p className="text-[11px] font-black text-[#8793AC] uppercase tracking-wider mb-1">Class average score</p>
-              <p className="text-[28px] font-black text-[#1E273F]">{loading ? "—" : `${data?.avgQuizScore ?? 84}%`}</p>
+              <p className="text-[28px] font-black text-[#1E273F]">{loading ? "—" : `${data?.avgQuizScore ?? 0}%`}</p>
             </div>
           </div>
           <div className="bg-white rounded-[24px] p-8 flex items-center gap-6 shadow-sm border border-[#E5E9F0]">
@@ -175,12 +184,15 @@ export default function TeacherDashboard() {
                       </div>
                       <div>
                         <p className="text-[15px] font-black text-[#1E273F]">{s.fullName}</p>
-                        {s.status === 'struggling' && (
-                          <p className="text-[11px] font-bold text-orange-500 mt-1 uppercase tracking-wider flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></span>
-                            Needs Support
-                          </p>
-                        )}
+                        {(() => {
+                          const sl = scoreLabel(s.quizAvg);
+                          return (
+                            <p className={`text-[11px] font-bold mt-1 uppercase tracking-wider flex items-center gap-1.5 ${sl.text}`}>
+                              <span className={`w-1.5 h-1.5 ${sl.dot} rounded-full`}></span>
+                              {sl.label}
+                            </p>
+                          );
+                        })()}
                       </div>
                     </div>
                   </td>

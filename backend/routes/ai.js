@@ -94,10 +94,12 @@ router.post("/generate-quiz", async (req, res) => {
       })
       .join("\n");
 
+    const seed = Date.now();
     const prompt = `
-You are a school quiz generator.
+You are a school quiz generator. Request ID: ${seed}
 
-Generate exactly 10 multiple-choice quiz questions ONLY from this lesson content.
+Generate exactly 10 UNIQUE multiple-choice quiz questions from this lesson content.
+Each call must produce DIFFERENT questions — vary which facts, examples, and concepts you test.
 
 Lesson title: ${lesson.title}
 Subject: ${lesson.subject}
@@ -111,6 +113,7 @@ Strict rules:
 - Do not ask general subject questions.
 - Do not use outside knowledge.
 - Do not repeat the same question.
+- Pick different angles, facts, and details from throughout the lesson.
 - Each question must test a specific fact, concept, example, or explanation from the lesson.
 - Exactly 4 options: A, B, C, D.
 - Exactly one correct answer.
@@ -142,7 +145,7 @@ Format:
           content: prompt,
         },
       ],
-      temperature: 0.4,
+      temperature: 0.8,
     });
 
     const text = completion.choices[0].message.content;

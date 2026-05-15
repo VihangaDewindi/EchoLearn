@@ -57,7 +57,7 @@ export default function ParentDashboard() {
   }, []);
 
   const student = data?.student;
-  const stats = data?.stats || { learningTimeHrs: "4.5", lessonsCompleted: 12, avgQuizScore: 88 };
+  const stats = data?.stats || { learningTimeHrs: "0.0", lessonsCompleted: 0, avgQuizScore: 0 };
   const subjects = data?.subjects || [
     { name: "Mathematics", progress: 0, color: "bg-[#33478D]" },
     { name: "Science", progress: 0, color: "bg-[#5AAF7B]" },
@@ -92,8 +92,10 @@ export default function ParentDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
            <div className="lg:col-span-2 bg-white rounded-[32px] p-8 border border-[#E5E9F0] flex items-center justify-between shadow-sm">
               <div className="flex items-center gap-6">
-                 <div className="w-24 h-24 rounded-full bg-slate-200 overflow-hidden border-4 border-[#F5F7FB]">
-                    <img src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&q=80&w=200" alt="Child" className="w-full h-full object-cover" />
+                 <div className="w-24 h-24 rounded-full bg-[#33478D] flex items-center justify-center border-4 border-[#F5F7FB]">
+                    <span className="text-white text-[32px] font-black">
+                      {student?.fullName ? student.fullName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "?"}
+                    </span>
                  </div>
                  <div>
                     <div className="flex items-center gap-3">

@@ -33,6 +33,7 @@ const lessonSchema = new mongoose.Schema(
     image: { type: String, default: "" },
     quizRoute: { type: String, default: "" },
     blocks: [lessonBlockSchema],
+    quiz: { type: [mongoose.Schema.Types.Mixed], default: [] },
   },
   { timestamps: true }
 );

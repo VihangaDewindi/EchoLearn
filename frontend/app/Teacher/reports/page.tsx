@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import TeacherNavbar from '@/components/Teacher/TeacherNavbar';
 import TeacherFooter from '@/components/Teacher/TeacherFooter';
 import {
-  Download, Share2, Calendar, RefreshCw,
+  Download, Share2, RefreshCw,
   Star, CheckCircle2, Users, AlertCircle,
   ArrowUpRight, Search, ArrowUpDown, FileText, TrendingUp,
 } from 'lucide-react';
@@ -12,7 +12,6 @@ import {
 const API = "http://localhost:5001";
 
 export default function ReportsPage() {
-  const [timeRange, setTimeRange] = useState('Last 30 Days');
   const [data, setData]           = useState<any>(null);
   const [loading, setLoading]     = useState(true);
   const [tableSearch, setTableSearch] = useState('');
@@ -48,12 +47,6 @@ export default function ReportsPage() {
     )
     .sort((a: any, b: any) => sortDesc ? b.quizAvg - a.quizAvg : a.quizAvg - b.quizAvg);
 
-  function getStatusProps(status: string) {
-    if (status === "excelling") return { label: "EXCEEDING", color: "bg-[#E9F7EF] text-[#2E7D32]", bar: "bg-[#2E7D32]" };
-    if (status === "struggling") return { label: "AT RISK",   color: "bg-[#FFF1F1] text-[#C81E1E]", bar: "bg-[#C81E1E]" };
-    return { label: "MEETING", color: "bg-[#EFF8FF] text-[#2D79C7]", bar: "bg-[#2D79C7]" };
-  }
-
   // ── CSV Export ──────────────────────────────────────────────────
   const handleCSVDownload = () => {
     if (!students.length) { showToast("No data to export."); return; }
@@ -82,15 +75,25 @@ export default function ReportsPage() {
     showToast("CSV downloaded successfully!");
   };
 
-  // ── Print Summary ───────────────────────────────────────────────
+  // ── Export PDF (print-to-PDF) ────────────────────────────────────
   const handlePrint = () => {
-    window.print();
+    showToast("Print dialog opened — choose 'Save as PDF' to download.");
+    setTimeout(() => window.print(), 400);
   };
+
+  function scoreLabel(avg: number): { label: string; bg: string; text: string } {
+    if (avg >= 90) return { label: "Excellent",            bg: "bg-[#ECFDF5]", text: "text-[#065F46]" };
+    if (avg >= 75) return { label: "Very Good",            bg: "bg-[#F0FDF4]", text: "text-[#166534]" };
+    if (avg >= 60) return { label: "Good Performance",     bg: "bg-[#EFF6FF]", text: "text-[#1E40AF]" };
+    if (avg >= 50) return { label: "Moderate Performance", bg: "bg-[#FEFCE8]", text: "text-[#92400E]" };
+    if (avg >= 40) return { label: "Below Average",        bg: "bg-[#FFF7ED]", text: "text-[#C2410C]" };
+    return           { label: "Needs Support",             bg: "bg-[#FFF1F1]", text: "text-[#C81E1E]" };
+  }
 
   // ── Share ───────────────────────────────────────────────────────
   const handleShare = () => {
     const summary =
-      `EchoLearn Class Report (${timeRange})\n` +
+      `EchoLearn Class Report\n` +
       `Avg Quiz Score: ${kpis.avgQuizScore}%\n` +
       `Lesson Completion: ${kpis.completionRate}%\n` +
       `Student Engagement: ${kpis.engagementRate}%\n` +
@@ -154,39 +157,15 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Filters Bar */}
-        <div className="bg-white p-4 rounded-[20px] border border-[#E5E9F0] shadow-sm mb-10 flex flex-wrap items-center justify-between gap-6 no-print">
-          <div className="flex items-center gap-6">
-            <div className="space-y-1">
-              <p className="text-[10px] font-black text-[#A0A9C0] uppercase tracking-widest pl-1">Time Range</p>
-              <div className="flex items-center bg-[#F8FAFD] p-1 rounded-xl border border-[#E5E9F0]">
-                {['Last 30 Days', 'Semester', 'Annual'].map((range) => (
-                  <button
-                    key={range}
-                    onClick={() => setTimeRange(range)}
-                    className={`px-4 py-2 rounded-lg text-[13px] font-black transition-all ${
-                      timeRange === range ? "bg-white text-[#33478D] shadow-sm" : "text-[#8793AC] hover:text-[#1E273F]"
-                    }`}
-                  >
-                    {range}
-                  </button>
-                ))}
-                <div className="w-[1px] h-6 bg-[#E5E9F0] mx-2"></div>
-                <button className="p-2 text-[#8793AC] hover:text-[#33478D]">
-                  <Calendar size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 pr-2">
-            <button
-              onClick={loadData}
-              className="p-2.5 text-[#8793AC] hover:bg-[#F5F7FB] rounded-xl transition-all border border-[#E5E9F0]"
-              title="Refresh data"
-            >
-              <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-            </button>
-          </div>
+        {/* Refresh action */}
+        <div className="flex justify-end mb-10 no-print">
+          <button
+            onClick={loadData}
+            className="p-2.5 text-[#8793AC] hover:bg-[#F5F7FB] rounded-xl transition-all border border-[#E5E9F0]"
+            title="Refresh data"
+          >
+            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+          </button>
         </div>
 
         {/* KPI Cards */}
@@ -242,7 +221,7 @@ export default function ReportsPage() {
             </div>
             <p className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider">At-Risk Students</p>
             <h3 className="text-[32px] font-black text-[#1E273F] mt-1">{loading ? "—" : kpis.atRisk}</h3>
-            <p className="text-[12px] font-bold text-[#A0A9C0] mt-3">Scoring below 60%</p>
+            <p className="text-[12px] font-bold text-[#A0A9C0] mt-3">Scoring below 40%</p>
           </div>
         </div>
 
@@ -279,27 +258,29 @@ export default function ReportsPage() {
             <div className="h-48 flex items-end justify-between px-2 gap-2">
               {loading ? (
                 <div className="w-full text-center text-[#8793AC] font-bold">Loading...</div>
+              ) : students.length === 0 ? (
+                <div className="w-full text-center text-[#8793AC] font-bold self-center">No student data yet.</div>
               ) : (() => {
-                const buckets = [0, 0, 0, 0, 0];
-                students.forEach((s: any) => {
-                  const score = s.quizAvg;
-                  if (score < 20) buckets[0]++;
-                  else if (score < 40) buckets[1]++;
-                  else if (score < 60) buckets[2]++;
-                  else if (score < 80) buckets[3]++;
-                  else buckets[4]++;
-                });
-                const maxVal = Math.max(...buckets, 1);
-                return buckets.map((val, i) => (
+                const tiers = [
+                  { label: "< 40%",   color: "bg-[#E85A4F]", min: 0,  max: 40  },
+                  { label: "40–49%",  color: "bg-[#EA580C]", min: 40, max: 50  },
+                  { label: "50–59%",  color: "bg-[#D97706]", min: 50, max: 60  },
+                  { label: "60–74%",  color: "bg-[#3B82F6]", min: 60, max: 75  },
+                  { label: "75–89%",  color: "bg-[#16a34a]", min: 75, max: 90  },
+                  { label: "90–100%", color: "bg-[#059669]", min: 90, max: 101 },
+                ];
+                const counts = tiers.map(t =>
+                  students.filter((s: any) => s.quizAvg >= t.min && s.quizAvg < t.max).length
+                );
+                const maxVal = Math.max(...counts, 1);
+                return tiers.map((t, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                    <span className="text-[11px] font-black text-[#1E273F]">{val}</span>
+                    <span className="text-[11px] font-black text-[#1E273F]">{counts[i]}</span>
                     <div
-                      className={`w-full rounded-t-lg transition-all duration-700 ${i === 4 ? 'bg-[#33478D]' : 'bg-[#F0F2FA]'}`}
-                      style={{ height: `${Math.max((val / maxVal) * 100, 4)}%` }}
+                      className={`w-full rounded-t-lg transition-all duration-700 ${t.color}`}
+                      style={{ height: `${Math.max((counts[i] / maxVal) * 100, 4)}%` }}
                     ></div>
-                    <span className="text-[10px] font-bold text-[#A0A9C0] uppercase">
-                      {['0-19', '20-39', '40-59', '60-79', '80+'][i]}
-                    </span>
+                    <span className="text-[9px] font-bold text-[#A0A9C0] text-center leading-tight">{t.label}</span>
                   </div>
                 ));
               })()}
@@ -351,8 +332,7 @@ export default function ReportsPage() {
                   {tableSearch ? `No students matching "${tableSearch}".` : "No student data yet."}
                 </td></tr>
               ) : filteredStudents.map((student: any, idx: number) => {
-                const { label, color, bar } = getStatusProps(student.status);
-                const avgProgress = Math.round((student.math + student.science + student.english) / 3);
+                const sl = scoreLabel(student.quizAvg);
                 return (
                   <tr key={idx} className="hover:bg-[#F8FAFD] transition-colors">
                     <td className="p-6 pl-10">
@@ -368,20 +348,32 @@ export default function ReportsPage() {
                     </td>
                     <td className="p-6">
                       <div className="flex justify-center">
-                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest ${color}`}>
-                          {label}
+                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black ${sl.bg} ${sl.text}`}>
+                          {sl.label}
                         </span>
                       </div>
                     </td>
-                    <td className="p-6 text-center text-[15px] font-black text-[#1E273F]">
-                      {student.quizAvg}%
+                    <td className="p-6 text-center">
+                      <p className="text-[15px] font-black text-[#1E273F]">{student.quizAvg}%</p>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${sl.bg} ${sl.text}`}>
+                        {sl.label}
+                      </span>
                     </td>
                     <td className="p-6">
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1 h-2 bg-[#F0F2F5] rounded-full overflow-hidden">
-                          <div className={`h-full ${bar} transition-all duration-700`} style={{ width: `${avgProgress}%` }}></div>
-                        </div>
-                        <span className="text-[12px] font-black text-[#8793AC] min-w-[30px]">{avgProgress}%</span>
+                      <div className="space-y-1.5">
+                        {[
+                          { label: "Math", val: student.math,    bar: "bg-[#33478D]" },
+                          { label: "Sci",  val: student.science, bar: "bg-[#5AAF7B]" },
+                          { label: "Eng",  val: student.english, bar: "bg-[#E58814]" },
+                        ].map(({ label, val, bar }) => (
+                          <div key={label} className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-[#8793AC] w-7 shrink-0">{label}</span>
+                            <div className="flex-1 h-1.5 bg-[#F0F2F5] rounded-full overflow-hidden">
+                              <div className={`h-full ${bar}`} style={{ width: `${val}%` }} />
+                            </div>
+                            <span className="text-[10px] font-black text-[#8793AC] w-7 text-right">{val}%</span>
+                          </div>
+                        ))}
                       </div>
                     </td>
                     <td className="p-6 text-center text-[14px] font-bold text-[#1E273F]">
