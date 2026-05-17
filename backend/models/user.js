@@ -33,6 +33,7 @@ const userSchema = new mongoose.Schema({
     science: { type: Number, default: 0 },
     english: { type: Number, default: 0 }
   },
+  weeklyGoalTotal: { type: Number, default: 5 },
   resetToken: { type: String },
   resetTokenExpiry: { type: Date },
 }, { timestamps: true });

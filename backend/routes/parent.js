@@ -15,7 +15,10 @@ async function getLinkedStudent(parentId) {
 /* ─── DASHBOARD ─────────────────────────────────────────────── */
 router.get("/dashboard", verifyToken, requireRole("parent"), async (req, res) => {
   try {
-    const student = await getLinkedStudent(req.user.id);
+    const [student, parentUser] = await Promise.all([
+      getLinkedStudent(req.user.id),
+      User.findById(req.user.id).select("weeklyGoalTotal").lean(),
+    ]);
     if (!student) {
       return res.status(404).json({ error: "No linked student found" });
     }
@@ -35,7 +38,7 @@ router.get("/dashboard", verifyToken, requireRole("parent"), async (req, res) =>
     const avgScore =
       Math.round((student.progress.math + student.progress.science + student.progress.english) / 3) || 88;
 
-    const weeklyGoalTotal = 5;
+    const weeklyGoalTotal = parentUser?.weeklyGoalTotal || 5;
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     const weeklyCompleted = await ActivityLog.countDocuments({
@@ -87,7 +90,10 @@ router.get("/dashboard", verifyToken, requireRole("parent"), async (req, res) =>
 /* ─── MY CHILD ───────────────────────────────────────────────── */
 router.get("/my-child", verifyToken, requireRole("parent"), async (req, res) => {
   try {
-    const student = await getLinkedStudent(req.user.id);
+    const [student, parentUser] = await Promise.all([
+      getLinkedStudent(req.user.id),
+      User.findById(req.user.id).select("weeklyGoalTotal").lean(),
+    ]);
     if (!student) return res.status(404).json({ error: "No linked student found" });
 
     const activity = await ActivityLog.find({ userId: student._id })
@@ -110,6 +116,7 @@ router.get("/my-child", verifyToken, requireRole("parent"), async (req, res) => 
         ? Math.round(quizLogs.reduce((a, q) => a + q.score, 0) / quizLogs.length)
         : Math.round((student.progress.math + student.progress.science + student.progress.english) / 3);
 
+    const weeklyGoalTotal = parentUser?.weeklyGoalTotal || 5;
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     const weeklyCompleted = await ActivityLog.countDocuments({
@@ -139,8 +146,8 @@ router.get("/my-child", verifyToken, requireRole("parent"), async (req, res) => 
         { name: "English", progress: student.progress.english, recent: "Grammar Basics", color: "bg-[#E5A644]" },
       ],
       weeklyGoal: {
-        completed: Math.min(weeklyCompleted, 5),
-        total: 5,
+        completed: Math.min(weeklyCompleted, weeklyGoalTotal),
+        total: weeklyGoalTotal,
       },
       activity: activity.map((a) => ({
         type: a.type,
@@ -153,6 +160,22 @@ router.get("/my-child", verifyToken, requireRole("parent"), async (req, res) => 
     });
   } catch (err) {
     console.error("Parent my-child error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/* ─── ADJUST WEEKLY GOAL ─────────────────────────────────────── */
+router.patch("/weekly-goal", verifyToken, requireRole("parent"), async (req, res) => {
+  try {
+    const { total } = req.body;
+    const parsed = parseInt(total, 10);
+    if (!parsed || parsed < 1 || parsed > 14) {
+      return res.status(400).json({ error: "Goal must be between 1 and 14" });
+    }
+    await User.findByIdAndUpdate(req.user.id, { weeklyGoalTotal: parsed });
+    res.json({ success: true, weeklyGoalTotal: parsed });
+  } catch (err) {
+    console.error("Weekly goal update error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });

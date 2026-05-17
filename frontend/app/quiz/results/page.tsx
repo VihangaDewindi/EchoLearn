@@ -23,13 +23,12 @@ function ResultsContent() {
   const lessonTitle = lessonSlug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   const pct         = Math.round((score / total) * 100);
 
-  const [user, setUser]           = useState<any>(null);
+  const [user, setUser]             = useState<any>(null);
   const [isListening, setIsListening] = useState(false);
   const [statusHint, setStatusHint]   = useState("Reading results…");
 
   const hasStartedRef    = useRef(false);
   const keepListeningRef = useRef(true);
-  const isSpeakingRef    = useRef(false);
   const recognitionRef   = useRef<any>(null);
 
   useEffect(() => {
@@ -42,28 +41,25 @@ function ResultsContent() {
     if (!recognition) return;
     recognitionRef.current = recognition;
 
-    // Reset on every effect run so Strict Mode re-mount doesn't leave listening dead
     keepListeningRef.current = true;
-    isSpeakingRef.current    = false;
 
     recognition.continuous     = true;
     recognition.interimResults = false;
     recognition.lang           = "en-US";
     recognition.maxAlternatives = 5;
 
-    const stopListening  = () => { try { recognition.stop(); } catch {} };
-    const startListening = () => {
-      if (!keepListeningRef.current || isSpeakingRef.current) return;
+    const stopRec  = () => { try { recognition.stop(); } catch {} };
+    const startRec = () => {
+      if (!keepListeningRef.current) return;
       try { recognition.start(); } catch {}
     };
 
+    // Stop recognition, speak, then restart after TTS ends
     const speakThen = (text: string, onEnd?: () => void) => {
-      isSpeakingRef.current = true;
-      // Keep recognition running during TTS so commands are heard immediately after
+      stopRec();
       speak(text, () => {
-        isSpeakingRef.current = false;
         onEnd?.();
-        if (keepListeningRef.current) setTimeout(startListening, 200);
+        if (keepListeningRef.current) setTimeout(startRec, 200);
       });
     };
 
@@ -71,45 +67,59 @@ function ResultsContent() {
     recognition.onend   = () => {
       setIsListening(false);
       if (!keepListeningRef.current) return;
+      // Restart after a short delay unless speech is still playing
       const tryRestart = () => {
-        if (window.speechSynthesis.speaking) { setTimeout(tryRestart, 500); return; }
-        if (keepListeningRef.current && !isSpeakingRef.current) startListening();
+        if (window.speechSynthesis.speaking) { setTimeout(tryRestart, 400); return; }
+        if (keepListeningRef.current) startRec();
       };
-      setTimeout(tryRestart, 600);
+      setTimeout(tryRestart, 400);
     };
     recognition.onerror = (e: any) => {
       const err = e?.error;
-      console.warn("Results recognition error:", err);
       if (err === "no-speech" || err === "audio-capture" || err === "network") {
-        setTimeout(startListening, 1200);
+        setTimeout(startRec, 1000);
       }
     };
 
     recognition.onresult = (event: any) => {
       const lastResult = event.results[event.results.length - 1];
-      // Check all alternatives so short or misheard phrases still navigate correctly
       for (let i = 0; i < lastResult.length; i++) {
         const cmd = lastResult[i].transcript.toLowerCase().trim();
         if (!cmd) continue;
-        console.log("[Results voice] alt", i, "heard:", cmd);
+        console.log("[Results voice] heard:", cmd);
 
-        if (cmd.includes("lesson") || cmd.includes("go back") || cmd.includes("review") || cmd.includes("keep learning")) {
+        if (
+          cmd.includes("lesson") ||
+          cmd.includes("go back") ||
+          cmd.includes("keep learning") ||
+          cmd.includes("go to lesson")
+        ) {
           keepListeningRef.current = false;
-          stopListening();
+          stopRec();
           window.speechSynthesis.cancel();
           router.push("/lessons");
           return;
         }
-        if (cmd.includes("achievement") || cmd.includes("badge") || cmd.includes("trophy") || cmd.includes("award")) {
+        if (
+          cmd.includes("achievement") ||
+          cmd.includes("badge") ||
+          cmd.includes("trophy") ||
+          cmd.includes("award")
+        ) {
           keepListeningRef.current = false;
-          stopListening();
+          stopRec();
           window.speechSynthesis.cancel();
           router.push("/achievements");
           return;
         }
-        if (cmd.includes("dashboard") || cmd.includes("home") || cmd.includes("go home") || cmd.includes("main")) {
+        if (
+          cmd.includes("home") ||
+          cmd.includes("dashboard") ||
+          cmd.includes("go home") ||
+          cmd.includes("main")
+        ) {
           keepListeningRef.current = false;
-          stopListening();
+          stopRec();
           window.speechSynthesis.cancel();
           router.push("/Student/dashboard");
           return;
@@ -124,21 +134,20 @@ function ResultsContent() {
 
       const gradeMsg = pct >= 80 ? "Excellent work!" : pct >= 60 ? "Good job!" : "Keep practising!";
       const announcement =
-        `Quiz complete! ${gradeMsg} You scored ${score} out of ${total} — that's ${pct} percent. ` +
-        `You've earned ${xp} XP and the ${badge} badge. ` +
+        `Quiz complete! ${gradeMsg} You scored ${score} out of ${total}, that's ${pct} percent. ` +
+        `You earned ${xp} XP and the ${badge} badge. ` +
         `Where would you like to go next? ` +
-        `Say "go to lessons" to keep learning, "go to achievements" to view your badges, or "go home" to return to your dashboard.`;
+        `Say go to lessons to keep learning, go to achievements to view your badges, or go home to return to your dashboard.`;
 
-      setStatusHint(`Say: "go to lessons", "achievements", or "go home"`);
+      setStatusHint(`Say: "go to lessons", "go to achievements", or "go home"`);
       speakThen(announcement);
     };
 
-    // Start recognition immediately so it's warm when the student speaks
-    setTimeout(startListening, 300);
     if (!hasStartedRef.current) {
       startAssistant();
     } else {
-      // Strict Mode second mount: TTS already ran, recognition already started above
+      // Strict Mode second mount — TTS already ran, just restart recognition
+      setTimeout(startRec, 300);
     }
 
     const unlock = async () => { await tryUnlockAudio(); startAssistant(); };
@@ -147,7 +156,6 @@ function ResultsContent() {
 
     return () => {
       keepListeningRef.current = false;
-      // Do NOT reset hasStartedRef — prevents double TTS in Strict Mode re-mount
       window.removeEventListener("click",   unlock);
       window.removeEventListener("keydown", unlock);
       try {

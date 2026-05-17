@@ -112,10 +112,22 @@ router.get("/students", ...adminOnly, async (req, res) => {
       { email:    { $regex: search, $options: "i" } },
     ];
     const students = await User.find(filter)
-      .select("fullName email xp streak level badges progress lastActive createdAt")
+      .select("fullName email xp streak level badges progress lastActive createdAt suspended")
       .sort({ xp: -1 })
       .limit(200);
-    res.json(students);
+
+    const studentIds = students.map(s => s._id);
+    const ParentStudentLink = require("../models/ParentStudentLink");
+    const links = await ParentStudentLink.find({ studentId: { $in: studentIds } })
+      .populate("parentId", "fullName email")
+      .lean();
+    const parentMap = {};
+    links.forEach(l => { if (l.parentId) parentMap[l.studentId.toString()] = l.parentId; });
+
+    res.json(students.map(s => ({
+      ...s.toObject(),
+      linkedParent: parentMap[s._id.toString()] || null,
+    })));
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch students" });
   }
@@ -152,9 +164,13 @@ router.patch("/students/:id", ...adminOnly, async (req, res) => {
     if (fullName) update.fullName = fullName;
     if (email)    update.email    = email;
     if (password) update.password = await bcrypt.hash(password, 10);
-    if (grade !== undefined)  update.level = Number(grade) || 1;
-    if (level !== undefined)  update.level = Number(level);
-    if (xp    !== undefined)  update.xp    = Number(xp);
+    if (grade !== undefined) update.level = Number(grade) || 1;
+    if (level !== undefined) update.level = Number(level);
+    if (xp !== undefined) {
+      update.xp = Number(xp);
+      // Auto-upgrade level: every 500 XP = 1 level, minimum level 1
+      update.level = Math.max(1, Math.floor(Number(xp) / 500) + 1);
+    }
     const student = await User.findOneAndUpdate({ _id: req.params.id, role: "student" }, update, { new: true }).select("-password");
     if (!student) return res.status(404).json({ error: "Student not found" });
     if (parentEmail) {
@@ -197,9 +213,15 @@ router.get("/teachers", ...adminOnly, async (req, res) => {
       .limit(200);
 
     const teacherIds = teachers.map(t => t._id);
-    const classes = await Class.find({ teacherId: { $in: teacherIds } })
-      .select("teacherId name subject gradeLevel students isArchived")
-      .lean();
+    const [classes, assignedLessons] = await Promise.all([
+      Class.find({ teacherId: { $in: teacherIds } })
+        .select("teacherId name subject gradeLevel students isArchived")
+        .lean(),
+      Lesson.find({ teacherId: { $in: teacherIds } })
+        .select("teacherId title subject grade slug level")
+        .sort({ subject: 1, title: 1 })
+        .lean(),
+    ]);
 
     const classMap = {};
     classes.forEach(c => {
@@ -208,9 +230,17 @@ router.get("/teachers", ...adminOnly, async (req, res) => {
       classMap[tid].push(c);
     });
 
+    const lessonMap = {};
+    assignedLessons.forEach(l => {
+      const tid = l.teacherId.toString();
+      if (!lessonMap[tid]) lessonMap[tid] = [];
+      lessonMap[tid].push(l);
+    });
+
     res.json(teachers.map(t => ({
       ...t.toObject(),
       classes:       classMap[t._id.toString()] || [],
+      lessons:       lessonMap[t._id.toString()] || [],
       totalStudents: (classMap[t._id.toString()] || []).reduce((a, c) => a + (c.students?.length || 0), 0),
     })));
   } catch (err) {

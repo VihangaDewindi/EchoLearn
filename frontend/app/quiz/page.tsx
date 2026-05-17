@@ -51,23 +51,44 @@ function QuizContent() {
           body: JSON.stringify({ lessonSlug }),
         });
         const data = await res.json();
-        if (data.quiz) {
-          // Ensure exactly one correct answer per question (guards against AI hallucinations)
-          const sanitized: Question[] = (data.quiz as Question[]).map(q => {
-            const correctCount = q.options.filter(o => o.isCorrect).length;
-            if (correctCount <= 1) return q;
-            let foundFirst = false;
-            return {
-              ...q,
-              options: q.options.map(o => {
-                if (o.isCorrect && !foundFirst) { foundFirst = true; return o; }
-                if (o.isCorrect) return { ...o, isCorrect: false };
-                return o;
-              }),
-            };
-          });
-          setQuestions(sanitized);
-          questionsRef.current = sanitized;
+        if (data.quiz && Array.isArray(data.quiz)) {
+          const letters = ["A", "B", "C", "D"];
+          // Normalise every question: fix isCorrect types, fill missing fields, ensure exactly 4 options
+          const normalised: Question[] = (data.quiz as any[])
+            .filter(q => q && q.question && Array.isArray(q.options) && q.options.length >= 2)
+            .map(q => {
+              const opts: Option[] = (q.options as any[]).map((o, i) => ({
+                letter:      o.letter      || letters[i] || String.fromCharCode(65 + i),
+                title:       o.title       || o.text || "Answer option",
+                description: o.description || "",
+                isCorrect:   o.isCorrect === true || o.isCorrect === "true",
+              }));
+              // Pad to 4 options if fewer
+              while (opts.length < 4) {
+                opts.push({ letter: letters[opts.length], title: "Not applicable", description: "", isCorrect: false });
+              }
+              // Ensure exactly one correct answer
+              const correctCount = opts.filter(o => o.isCorrect).length;
+              if (correctCount === 0) opts[0] = { ...opts[0], isCorrect: true };
+              if (correctCount > 1) {
+                let found = false;
+                for (let i = 0; i < opts.length; i++) {
+                  if (opts[i].isCorrect && !found) { found = true; }
+                  else if (opts[i].isCorrect) { opts[i] = { ...opts[i], isCorrect: false }; }
+                }
+              }
+              return { question: q.question, options: opts };
+            });
+
+          // Pad to 10 questions if AI returned fewer
+          if (normalised.length > 0 && normalised.length < 10) {
+            const base = [...normalised];
+            while (normalised.length < 10) normalised.push(base[normalised.length % base.length]);
+          }
+
+          const final = normalised.slice(0, 10);
+          setQuestions(final);
+          questionsRef.current = final;
         }
       } catch (err) {
         console.error("Failed to fetch quiz:", err);

@@ -99,8 +99,8 @@ export default function AdminParents() {
       body: JSON.stringify(body),
     });
     if (res.ok) {
-      const updated = await res.json();
-      setParents(prev => prev.map(p => p._id === updated._id ? { ...p, ...updated } : p));
+      // Re-fetch parents to get updated children array populated from server
+      fetchParents(token, search);
       setEditParent(null);
       showToast("Parent updated.");
     } else { showToast("Failed to update parent."); }
@@ -361,14 +361,15 @@ function ParentForm({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // When field is empty, show all students (max 8); otherwise filter by name/email
   const suggestions = form.childEmail.trim()
     ? students
         .filter(s =>
           s.fullName.toLowerCase().includes(form.childEmail.toLowerCase()) ||
           s.email.toLowerCase().includes(form.childEmail.toLowerCase())
         )
-        .slice(0, 6)
-    : [];
+        .slice(0, 8)
+    : students.slice(0, 8);
 
   return (
     <div className="space-y-4">

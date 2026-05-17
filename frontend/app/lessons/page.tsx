@@ -446,7 +446,7 @@ const stateRef = useRef<{
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 pb-40">
               {lessons.map((lesson) => {
                 const progObj = allProgress.find(p => p.lessonSlug === lesson.slug);
-                const currentProgress = progObj ? progObj.progress : (lesson.progress || 0);
+                const currentProgress = progObj ? progObj.progress : 0;
                 const currentStatus: "Completed" | "In Progress" | "Not Started" =
                   currentProgress >= 100 ? "Completed" :
                   currentProgress > 0    ? "In Progress" :

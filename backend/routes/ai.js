@@ -11,59 +11,54 @@ function buildLocalQuizFromLesson(lesson) {
 
   lesson.blocks.forEach((block) => {
     if (block.text) facts.push(block.text);
-
     if (block.items) {
       block.items.forEach((item) => {
-        facts.push(`${item.title}: ${item.text}`);
+        if (item.title && item.text) facts.push(`${item.title}: ${item.text}`);
+        else if (item.title) facts.push(item.title);
       });
     }
   });
 
   const cleanFacts = facts
     .map((f) => f.replace(/\s+/g, " ").trim())
-    .filter((f) => f.length > 30);
+    .filter((f) => f.length > 20);
 
-  const questions = cleanFacts.slice(0, 10).map((fact, index) => {
+  // Need at least 4 facts for distractors; pad if necessary
+  while (cleanFacts.length < 4) {
+    cleanFacts.push(`${lesson.title} is a lesson about ${lesson.subject}.`);
+  }
+
+  // Generate up to 10 questions, cycling through facts if fewer than 10
+  const TARGET = 10;
+  const questions = [];
+  for (let idx = 0; idx < TARGET; idx++) {
+    const factIdx = idx % cleanFacts.length;
+    const fact = cleanFacts[factIdx];
+
     const wrongOptions = cleanFacts
-      .filter((_, i) => i !== index)
+      .filter((_, i) => i !== factIdx)
       .slice(0, 3);
 
     while (wrongOptions.length < 3) {
-      wrongOptions.push("This is not the correct answer for this question.");
+      wrongOptions.push(`This does not describe ${lesson.title}.`);
     }
 
-    const options = [
-      {
-        letter: "A",
-        title: fact.slice(0, 130),
-        description: "Correct answer from the selected lesson.",
-        isCorrect: true,
-      },
-      {
-        letter: "B",
-        title: wrongOptions[0].slice(0, 130),
-        description: "Incorrect option",
-        isCorrect: false,
-      },
-      {
-        letter: "C",
-        title: wrongOptions[1].slice(0, 130),
-        description: "Incorrect option",
-        isCorrect: false,
-      },
-      {
-        letter: "D",
-        title: wrongOptions[2].slice(0, 130),
-        description: "Incorrect option",
-        isCorrect: false,
-      },
-    ];
+    // Shuffle correct answer into a random position (A-D)
+    const pos = idx % 4;
+    const allOpts = [fact, wrongOptions[0], wrongOptions[1], wrongOptions[2]];
+    const correct = allOpts.splice(0, 1)[0];
+    allOpts.splice(pos, 0, correct);
 
-    return {
-      question: "Which statement from the lesson is correct?",
-      options,
-    };
-  });
+    questions.push({
+      question: `Question ${idx + 1}: Which of the following is correct about "${lesson.title}"?`,
+      options: allOpts.map((o, i) => ({
+        letter: ["A", "B", "C", "D"][i],
+        title: o.slice(0, 130),
+        description: i === pos ? "Correct answer from the lesson." : "Incorrect option",
+        isCorrect: i === pos,
+      })),
+    });
+  }
 
   return questions;
 }

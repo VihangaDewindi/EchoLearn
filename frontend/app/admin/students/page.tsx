@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminNavbar from "@/components/Admin/AdminNavbar";
-import { Search, Trophy, Flame, Star, Plus, Edit3, Trash2, X, Save, Eye } from "lucide-react";
+import { Search, Trophy, Flame, Star, Plus, Edit3, Trash2, X, Save, Eye, UserCheck } from "lucide-react";
 
 const API = "http://localhost:5001";
 
@@ -15,7 +15,9 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
   );
 }
 
-const BLANK_FORM = { fullName: "", email: "", password: "", grade: "1", parentEmail: "", status: "active" };
+const computeLevel = (xp: number) => Math.max(1, Math.floor(xp / 500) + 1);
+
+const BLANK_FORM = { fullName: "", email: "", password: "", xp: "0", parentEmail: "", status: "active" };
 
 export default function AdminStudents() {
   const router = useRouter();
@@ -31,7 +33,7 @@ export default function AdminStudents() {
   const [addSaving, setAddSaving] = useState(false);
 
   const [editStudent, setEditStudent] = useState<any>(null);
-  const [editForm, setEditForm]       = useState({ fullName: "", email: "", password: "", grade: "1", xp: "0", parentEmail: "", status: "active" });
+  const [editForm, setEditForm]       = useState({ fullName: "", email: "", password: "", xp: "0", parentEmail: "", status: "active" });
   const [editSaving, setEditSaving]   = useState(false);
 
   const [viewStudent, setViewStudent]   = useState<any>(null);
@@ -69,7 +71,7 @@ export default function AdminStudents() {
     const res = await fetch(`${API}/api/admin/students`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(addForm),
+      body: JSON.stringify({ ...addForm, grade: "1" }),
     });
     if (res.ok) {
       const created = await res.json();
@@ -86,15 +88,21 @@ export default function AdminStudents() {
 
   const openEdit = (s: any) => {
     setEditStudent(s);
-    setEditForm({ fullName: s.fullName, email: s.email, password: "", grade: String(s.level || 1), xp: String(s.xp || 0), parentEmail: "", status: s.suspended ? "suspended" : "active" });
+    setEditForm({
+      fullName:    s.fullName,
+      email:       s.email,
+      password:    "",
+      xp:          String(s.xp || 0),
+      parentEmail: s.linkedParent?.email || "",
+      status:      s.suspended ? "suspended" : "active",
+    });
   };
 
   const handleEdit = async () => {
     if (!editStudent) return;
     setEditSaving(true);
-    const body: any = { fullName: editForm.fullName, email: editForm.email, grade: editForm.grade, xp: editForm.xp, status: editForm.status };
+    const body: any = { fullName: editForm.fullName, email: editForm.email, xp: editForm.xp, status: editForm.status };
     if (editForm.password.trim()) body.password = editForm.password;
-    if (editForm.parentEmail.trim()) body.parentEmail = editForm.parentEmail;
     const res = await fetch(`${API}/api/admin/students/${editStudent._id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -102,7 +110,7 @@ export default function AdminStudents() {
     });
     if (res.ok) {
       const updated = await res.json();
-      setStudents(prev => prev.map(s => s._id === updated._id ? { ...s, ...updated } : s));
+      setStudents(prev => prev.map(s => s._id === updated._id ? { ...s, ...updated, linkedParent: s.linkedParent } : s));
       setEditStudent(null);
       showToast("Student updated.");
     } else { showToast("Failed to update student."); }
@@ -131,8 +139,6 @@ export default function AdminStudents() {
     if (lvl >= 5) return "bg-blue-100 text-blue-700";
     return "bg-gray-100 text-gray-600";
   };
-
-  const GRADES = Array.from({ length: 10 }, (_, i) => String(i + 1));
 
   return (
     <div className="flex min-h-screen bg-[#F4F6FA]">
@@ -182,54 +188,59 @@ export default function AdminStudents() {
               ) : students.length === 0 ? (
                 <tr><td colSpan={8} className="px-6 py-12 text-center text-[#8793AC] font-bold">No students found.</td></tr>
               ) : (
-                students.map(s => (
-                  <tr key={s._id} className="border-b border-[#F4F6FA] hover:bg-[#F8FAFF] transition">
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-sm flex-shrink-0">
-                          {s.fullName?.charAt(0)?.toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-bold text-[#1E2B5A] leading-none">{s.fullName}</p>
-                          <p className="text-[11px] text-[#8793AC] mt-0.5">{s.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={`px-2.5 py-1 rounded-[8px] text-[12px] font-black ${levelColor(s.level)}`}>Lv {s.level}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-1.5 font-black text-[#1E2B5A]"><Star size={14} className="text-yellow-500" />{(s.xp || 0).toLocaleString()}</div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-1.5 font-black text-[#1E2B5A]"><Flame size={14} className="text-orange-500" />{s.streak || 0}d</div>
-                    </td>
-                    <td className="px-5 py-4 min-w-[160px]">
-                      <div className="space-y-1.5">
-                        {[["Math", s.progress?.math || 0, "bg-blue-500"], ["Sci", s.progress?.science || 0, "bg-emerald-500"], ["Eng", s.progress?.english || 0, "bg-purple-500"]].map(([label, val, color]) => (
-                          <div key={label as string} className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-[#8793AC] w-7">{label}</span>
-                            <ProgressBar value={val as number} color={color as string} />
-                            <span className="text-[10px] font-black text-[#8793AC] w-7 text-right">{val}%</span>
+                students.map(s => {
+                  const displayLevel = computeLevel(s.xp || 0);
+                  return (
+                    <tr key={s._id} className="border-b border-[#F4F6FA] hover:bg-[#F8FAFF] transition">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-sm flex-shrink-0">
+                            {s.fullName?.charAt(0)?.toUpperCase()}
                           </div>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      {s.badges?.length > 0
-                        ? <div className="flex items-center gap-1"><Trophy size={14} className="text-yellow-500" /><span className="font-black text-[#1E2B5A]">{s.badges.length}</span></div>
-                        : <span className="text-[#8793AC] font-bold">—</span>}
-                    </td>
-                    <td className="px-5 py-4 text-[#8793AC] font-bold">{s.lastActive ? new Date(s.lastActive).toLocaleDateString() : "—"}</td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => setViewStudent(s)} className="p-2 rounded-lg text-[#8793AC] hover:bg-blue-50 hover:text-blue-600 transition" title="View"><Eye size={15} /></button>
-                        <button onClick={() => openEdit(s)} className="p-2 rounded-lg text-[#8793AC] hover:bg-indigo-50 hover:text-indigo-600 transition" title="Edit"><Edit3 size={15} /></button>
-                        <button onClick={() => setDeleteStudent(s)} className="p-2 rounded-lg text-[#8793AC] hover:bg-red-50 hover:text-red-500 transition" title="Delete"><Trash2 size={15} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <div>
+                            <p className="font-bold text-[#1E2B5A] leading-none">{s.fullName}</p>
+                            <p className="text-[11px] text-[#8793AC] mt-0.5">{s.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className={`px-2.5 py-1 rounded-[8px] text-[12px] font-black ${levelColor(displayLevel)}`}>Lv {displayLevel}</span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-1.5 font-black text-[#1E2B5A]"><Star size={14} className="text-yellow-500" />{(s.xp || 0).toLocaleString()}</div>
+                      </td>
+                      <td className="px-5 py-4">
+                        {(s.streak || 0) > 0
+                          ? <div className="flex items-center gap-1.5 font-black text-[#1E2B5A]"><Flame size={14} className="text-orange-500" />{s.streak}d</div>
+                          : <span className="text-[#C0C8D6] font-bold text-[12px]">No streak</span>}
+                      </td>
+                      <td className="px-5 py-4 min-w-[160px]">
+                        <div className="space-y-1.5">
+                          {[["Math", s.progress?.math || 0, "bg-blue-500"], ["Sci", s.progress?.science || 0, "bg-emerald-500"], ["Eng", s.progress?.english || 0, "bg-purple-500"]].map(([label, val, color]) => (
+                            <div key={label as string} className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-[#8793AC] w-7">{label}</span>
+                              <ProgressBar value={val as number} color={color as string} />
+                              <span className="text-[10px] font-black text-[#8793AC] w-7 text-right">{val}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        {s.badges?.length > 0
+                          ? <div className="flex items-center gap-1"><Trophy size={14} className="text-yellow-500" /><span className="font-black text-[#1E2B5A]">{s.badges.length}</span></div>
+                          : <span className="text-[#8793AC] font-bold">—</span>}
+                      </td>
+                      <td className="px-5 py-4 text-[#8793AC] font-bold">{s.lastActive ? new Date(s.lastActive).toLocaleDateString() : "—"}</td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => setViewStudent(s)} className="p-2 rounded-lg text-[#8793AC] hover:bg-blue-50 hover:text-blue-600 transition" title="View"><Eye size={15} /></button>
+                          <button onClick={() => openEdit(s)} className="p-2 rounded-lg text-[#8793AC] hover:bg-indigo-50 hover:text-indigo-600 transition" title="Edit"><Edit3 size={15} /></button>
+                          <button onClick={() => setDeleteStudent(s)} className="p-2 rounded-lg text-[#8793AC] hover:bg-red-50 hover:text-red-500 transition" title="Delete"><Trash2 size={15} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -249,7 +260,7 @@ export default function AdminStudents() {
               <h2 className="text-[22px] font-black text-[#1E2B5A]">Add Student</h2>
               <button onClick={() => setAddOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl"><X size={20} className="text-[#8793AC]" /></button>
             </div>
-            <StudentForm form={addForm} setForm={setAddForm} grades={GRADES} showPassword />
+            <StudentForm form={addForm} setForm={setAddForm} showPassword isAdd />
             <div className="flex gap-3 mt-8">
               <button onClick={() => setAddOpen(false)} className="flex-1 py-3 rounded-xl border border-[#E9EDF5] text-[14px] font-black text-[#8793AC] hover:bg-gray-50">Cancel</button>
               <button onClick={handleAdd} disabled={addSaving || !addForm.fullName.trim() || !addForm.email.trim() || !addForm.password.trim()}
@@ -269,7 +280,7 @@ export default function AdminStudents() {
               <h2 className="text-[22px] font-black text-[#1E2B5A]">Edit Student</h2>
               <button onClick={() => setEditStudent(null)} className="p-2 hover:bg-gray-100 rounded-xl"><X size={20} className="text-[#8793AC]" /></button>
             </div>
-            <StudentForm form={editForm} setForm={setEditForm} grades={GRADES} showPassword showXP />
+            <StudentForm form={editForm} setForm={setEditForm} showPassword showXP />
             <div className="flex gap-3 mt-8">
               <button onClick={() => setEditStudent(null)} className="flex-1 py-3 rounded-xl border border-[#E9EDF5] text-[14px] font-black text-[#8793AC] hover:bg-gray-50">Cancel</button>
               <button onClick={handleEdit} disabled={editSaving}
@@ -298,12 +309,13 @@ export default function AdminStudents() {
             </div>
             <div className="space-y-3 mb-4">
               {[
-                { label: "Grade / Level", value: `Grade ${viewStudent.level || 1}` },
-                { label: "XP", value: (viewStudent.xp || 0).toLocaleString() },
-                { label: "Streak", value: `${viewStudent.streak || 0} days` },
-                { label: "Badges", value: `${viewStudent.badges?.length || 0} earned` },
-                { label: "Last Active", value: viewStudent.lastActive ? new Date(viewStudent.lastActive).toLocaleDateString() : "—" },
-                { label: "Joined", value: viewStudent.createdAt ? new Date(viewStudent.createdAt).toLocaleDateString() : "—" },
+                { label: "Level",          value: `Level ${computeLevel(viewStudent.xp || 0)}` },
+                { label: "XP",             value: (viewStudent.xp || 0).toLocaleString() },
+                { label: "Streak",         value: (viewStudent.streak || 0) > 0 ? `${viewStudent.streak} days` : "No streak yet" },
+                { label: "Badges",         value: `${viewStudent.badges?.length || 0} earned` },
+                { label: "Linked Parent",  value: viewStudent.linkedParent?.fullName || "—" },
+                { label: "Last Active",    value: viewStudent.lastActive ? new Date(viewStudent.lastActive).toLocaleDateString() : "—" },
+                { label: "Joined",         value: viewStudent.createdAt ? new Date(viewStudent.createdAt).toLocaleDateString() : "—" },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between items-center py-2 border-b border-[#F4F6FA]">
                   <span className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider">{label}</span>
@@ -353,7 +365,15 @@ export default function AdminStudents() {
   );
 }
 
-function StudentForm({ form, setForm, grades, showPassword, showXP }: { form: any; setForm: (f: any) => void; grades: string[]; showPassword?: boolean; showXP?: boolean }) {
+function StudentForm({
+  form, setForm, showPassword, showXP, isAdd,
+}: {
+  form: any;
+  setForm: (f: any) => void;
+  showPassword?: boolean;
+  showXP?: boolean;
+  isAdd?: boolean;
+}) {
   return (
     <div className="space-y-4">
       <div>
@@ -368,39 +388,53 @@ function StudentForm({ form, setForm, grades, showPassword, showXP }: { form: an
       </div>
       {showPassword && (
         <div>
-          <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Password {form._id ? "(leave blank to keep)" : "*"}</label>
+          <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">
+            Password {!isAdd ? "(leave blank to keep)" : "*"}
+          </label>
           <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
             className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A]" />
         </div>
       )}
-      <div className="grid grid-cols-2 gap-4">
+      {showXP && (
         <div>
-          <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Grade</label>
-          <select value={form.grade} onChange={e => setForm({ ...form, grade: e.target.value })}
-            className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[14px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A] bg-white">
-            {grades.map(g => <option key={g} value={g}>Grade {g}</option>)}
-          </select>
+          <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">XP Points</label>
+          <input type="number" value={form.xp} onChange={e => setForm({ ...form, xp: e.target.value })} min={0}
+            className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[14px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A]" />
+          <p className="text-[11px] text-[#8793AC] font-bold mt-1">
+            Level auto-upgrades: every 500 XP = 1 level
+          </p>
         </div>
-        {showXP && (
-          <div>
-            <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">XP Points</label>
-            <input type="number" value={form.xp} onChange={e => setForm({ ...form, xp: e.target.value })} min={0}
-              className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[14px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A]" />
+      )}
+      {/* Linked parent — pre-filled and read-only in edit, editable in add */}
+      <div>
+        <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">
+          {isAdd ? "Parent Email (optional)" : "Linked Parent"}
+        </label>
+        {isAdd ? (
+          <input type="email" value={form.parentEmail} onChange={e => setForm({ ...form, parentEmail: e.target.value })}
+            placeholder="Links student to parent account"
+            className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A]" />
+        ) : (
+          <div className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 bg-[#F8FAFF] flex items-center gap-2">
+            <UserCheck size={15} className="text-[#8793AC] flex-shrink-0" />
+            <span className="text-[14px] font-bold text-[#8793AC]">
+              {form.parentEmail || "No parent linked"}
+            </span>
+            {form.parentEmail && (
+              <span className="ml-auto text-[11px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md">Linked</span>
+            )}
           </div>
         )}
-      </div>
-      <div>
-        <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Parent Email (optional)</label>
-        <input type="email" value={form.parentEmail} onChange={e => setForm({ ...form, parentEmail: e.target.value })}
-          placeholder="Links student to parent account"
-          className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[15px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A]" />
+        {!isAdd && (
+          <p className="text-[11px] text-[#8793AC] font-bold mt-1">Parent link is managed from the Parents section.</p>
+        )}
       </div>
       <div>
         <label className="text-[12px] font-black text-[#8793AC] uppercase tracking-wider mb-1.5 block">Status</label>
         <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
           className="w-full border border-[#E9EDF5] rounded-xl px-4 py-3 text-[14px] font-bold text-[#1E2B5A] focus:outline-none focus:border-[#1E2B5A] bg-white">
           <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
+          <option value="suspended">Suspended</option>
         </select>
       </div>
     </div>

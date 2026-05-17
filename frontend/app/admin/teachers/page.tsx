@@ -25,15 +25,15 @@ export default function AdminTeachers() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [toast, setToast]       = useState("");
 
-  const [addOpen, setAddOpen]   = useState(false);
-  const [addForm, setAddForm]   = useState({ ...BLANK_FORM });
+  const [addOpen, setAddOpen]     = useState(false);
+  const [addForm, setAddForm]     = useState({ ...BLANK_FORM });
   const [addSaving, setAddSaving] = useState(false);
 
   const [editTeacher, setEditTeacher] = useState<any>(null);
   const [editForm, setEditForm]       = useState({ fullName: "", email: "", password: "", status: "active" });
   const [editSaving, setEditSaving]   = useState(false);
 
-  const [viewTeacher, setViewTeacher]   = useState<any>(null);
+  const [viewTeacher, setViewTeacher]     = useState<any>(null);
   const [deleteTeacher, setDeleteTeacher] = useState<any>(null);
   const [deleting, setDeleting]           = useState(false);
 
@@ -72,7 +72,7 @@ export default function AdminTeachers() {
     });
     if (res.ok) {
       const created = await res.json();
-      setTeachers(prev => [{ ...created, classes: [] }, ...prev]);
+      setTeachers(prev => [{ ...created, classes: [], lessons: [] }, ...prev]);
       setAddOpen(false);
       setAddForm({ ...BLANK_FORM });
       showToast("Teacher created successfully.");
@@ -161,7 +161,8 @@ export default function AdminTeachers() {
             <div className="bg-white rounded-[20px] border border-[#E9EDF5] p-12 text-center text-[#8793AC] font-bold">No teachers found.</div>
           ) : (
             teachers.map(t => {
-              const isOpen = expanded[t._id];
+              const isOpen       = expanded[t._id];
+              const lessonCount  = (t.lessons || []).length;
               const totalStudents = (t.classes || []).reduce((s: number, c: any) => s + (c.students?.length || 0), 0);
               return (
                 <div key={t._id} className="bg-white rounded-[20px] border border-[#E9EDF5] shadow-sm overflow-hidden">
@@ -175,7 +176,10 @@ export default function AdminTeachers() {
                         <p className="text-[12px] text-[#8793AC] mt-1">{t.email}</p>
                       </div>
                       <div className="flex items-center gap-5 text-[13px] font-bold text-[#8793AC] flex-shrink-0">
-                        <div className="flex items-center gap-1.5"><BookOpen size={14} />{(t.classes || []).length} class{(t.classes || []).length !== 1 ? "es" : ""}</div>
+                        <div className="flex items-center gap-1.5">
+                          <BookOpen size={14} />
+                          {lessonCount} lesson{lessonCount !== 1 ? "s" : ""}
+                        </div>
                         <div className="flex items-center gap-1.5"><Users size={14} />{totalStudents} student{totalStudents !== 1 ? "s" : ""}</div>
                         <span className="text-[11px]">Active {t.lastActive ? new Date(t.lastActive).toLocaleDateString() : "—"}</span>
                         {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -190,22 +194,23 @@ export default function AdminTeachers() {
 
                   {isOpen && (
                     <div className="border-t border-[#E9EDF5] px-6 py-5 bg-[#F8FAFF]">
-                      {(t.classes || []).length === 0 ? (
-                        <p className="text-[13px] font-bold text-[#8793AC]">No classes assigned yet.</p>
+                      {lessonCount === 0 ? (
+                        <p className="text-[13px] font-bold text-[#8793AC]">No lessons assigned yet.</p>
                       ) : (
                         <div className="grid grid-cols-2 gap-3">
-                          {(t.classes || []).map((c: any) => (
-                            <div key={c._id} className="bg-white border border-[#E9EDF5] rounded-[14px] px-4 py-3 flex items-center gap-3">
+                          {(t.lessons || []).map((l: any) => (
+                            <div key={l._id} className="bg-white border border-[#E9EDF5] rounded-[14px] px-4 py-3 flex items-center gap-3">
                               <div className="flex-1 min-w-0">
-                                <p className="font-black text-[#1E2B5A] text-[13px] truncate">{c.name}</p>
+                                <p className="font-black text-[#1E2B5A] text-[13px] truncate">{l.title}</p>
                                 <div className="flex items-center gap-2 mt-1">
-                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-[6px] capitalize ${SUBJECT_COLORS[c.subject?.toLowerCase()] || "bg-gray-100 text-gray-600"}`}>{c.subject}</span>
-                                  <span className="text-[11px] text-[#8793AC] font-bold">{c.gradeLevel}</span>
+                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-[6px] capitalize ${SUBJECT_COLORS[l.subject?.toLowerCase()] || "bg-gray-100 text-gray-600"}`}>
+                                    {l.subject}
+                                  </span>
+                                  <span className="text-[11px] text-[#8793AC] font-bold">Grade {l.grade}</span>
                                 </div>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <p className="font-black text-[#1E2B5A] text-[15px]">{c.students?.length || 0}</p>
-                                <p className="text-[10px] text-[#8793AC] font-bold">students</p>
+                                <span className="text-[11px] font-bold text-[#8793AC] capitalize">{l.level || "Beginner"}</span>
                               </div>
                             </div>
                           ))}
@@ -304,7 +309,7 @@ export default function AdminTeachers() {
             </div>
             <div className="space-y-3">
               {[
-                { label: "Classes", value: `${(viewTeacher.classes || []).length} assigned` },
+                { label: "Assigned Lessons", value: `${(viewTeacher.lessons || []).length} lesson${(viewTeacher.lessons || []).length !== 1 ? "s" : ""}` },
                 { label: "Total Students", value: (viewTeacher.classes || []).reduce((s: number, c: any) => s + (c.students?.length || 0), 0) },
                 { label: "Last Active", value: viewTeacher.lastActive ? new Date(viewTeacher.lastActive).toLocaleDateString() : "—" },
                 { label: "Joined", value: viewTeacher.createdAt ? new Date(viewTeacher.createdAt).toLocaleDateString() : "—" },
